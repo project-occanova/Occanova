@@ -19,6 +19,7 @@ export async function GET(req:NextRequest,{params}:{params:Promise<{path:string[
 }
 export async function POST(req:NextRequest,{params}:{params:Promise<{path:string[]}>}) {
  try {
+  if(process.env.VERCEL==='1'||process.env.OCCANOVA_READ_ONLY==='true')return fail('This public preview is read-only until production services are connected.',503);
   const route=(await params).path.join('/');
   const origin=req.headers.get('origin');
   const expectedOrigin=process.env.NEXT_PUBLIC_SITE_URL || `${req.nextUrl.protocol}//${req.headers.get('host')}`;

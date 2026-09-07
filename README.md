@@ -12,6 +12,8 @@ npm run dev
 
 Open http://127.0.0.1:3000. `LOCAL_PREVIEW=true` exposes test-only verification/reset links; never enable it on a public host. Use invented test data. Local records persist in ignored `data/preview.json`.
 
+On Vercel, the app automatically becomes a read-only public preview because its local JSON adapter cannot persist safely in serverless functions. Public discovery remains available; account and enquiry writes stay disabled until the production database and service adapters are connected.
+
 ## Working flows
 
 - Homepage, category/city discovery, search, pagination, empty states and public profiles.
