@@ -1,0 +1,6 @@
+export type VendorStatus = 'draft'|'pending'|'approved'|'rejected'|'suspended'|'inactive';
+export type Vendor = { id:string; userId:string; name:string; slug:string; owner:string; category:string; city:string; locations:string[]; experience:number; description:string; summary:string; price:number; phone:string; whatsapp:string; email:string; image:string; gallery:string[]; status:VendorStatus; published:boolean; featured:boolean; priority:number; featuredStart:string; featuredEnd:string; remarks:string; sample:boolean; };
+export type User = { id:string; email:string; phone:string; passwordHash:string; role:'vendor'|'admin'; verified:boolean; };
+export type Enquiry = { id:string; vendorId:string; name:string; contact:string; city:string; date:string; service:string; message:string; consent:true; status:'new'|'contacted'|'closed'; createdAt:string; };
+export type Taxon = {name:string; slug:string; active:boolean};
+export type State = { vendors:Vendor[]; users:User[]; enquiries:Enquiry[]; sessions:{hash:string; userId:string; expires:number}[]; tokens:{hash:string; userId:string; kind:'verify'|'reset'; expires:number}[]; categories:Taxon[]; locations:Taxon[]; audit:{id:string; actor:string; action:string; target:string; remarks:string; at:string}[] };

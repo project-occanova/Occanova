@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {initialState} from '../src/lib/seed';
+import {publicVendors,isFeatured} from '../src/lib/directory';
+import {enquirySchema} from '../src/lib/validation';
+import {hashPassword,checkPassword,digest} from '../src/lib/auth';
+test('hidden, unapproved and suspended vendors never enter discovery',()=>{const s=initialState();s.vendors[0].published=false;s.vendors[1].status='pending';s.vendors[2].status='suspended';assert.equal(publicVendors(s.vendors).length,5);});
+test('category and city filters intersect, including URL slugs',()=>{const rows=publicVendors(initialState().vendors,{category:'decor-styling',city:'kochi'});assert.equal(rows.length,1);assert.equal(rows[0].name,'The Marigold Collective');assert.equal(publicVendors(initialState().vendors,{category:'photography',city:'thrissur'}).length,0);});
+test('Featured priority beats alphabetical order; normal listings sort alphabetically',()=>{const s=initialState();s.vendors[2].priority=0;const rows=publicVendors(s.vendors);assert.equal(rows[0].name,'Saffron Table');const normal=rows.filter(v=>!isFeatured(v));assert.deepEqual(normal.map(v=>v.name),normal.map(v=>v.name).sort());});
+test('Featured dates activate and expire inclusively',()=>{const v=initialState().vendors[0];v.featuredStart='2026-09-07';v.featuredEnd='2026-09-10';assert.equal(isFeatured(v,Date.parse('2026-09-06T23:59:59Z')),false);assert.equal(isFeatured(v,Date.parse('2026-09-07T00:00:00Z')),true);assert.equal(isFeatured(v,Date.parse('2026-09-10T23:59:59Z')),true);assert.equal(isFeatured(v,Date.parse('2026-09-11T00:00:00Z')),false);});
+test('enquiries require contact, consent, a future date, and a blank honeypot',()=>{const e={vendorId:'sample-1',name:'Test Guest',contact:'guest@example.test',city:'Kochi',date:'2099-01-01',service:'Decor',message:'A test enquiry for a celebration.',consent:true,website:''};assert.equal(enquirySchema.safeParse(e).success,true);for(const change of [{consent:false},{contact:'invalid'},{date:'2000-01-01'},{website:'spam'}])assert.equal(enquirySchema.safeParse({...e,...change}).success,false);});
+test('password hashes are salted and safely reject incorrect passwords',()=>{const a=hashPassword('a-valid-test-password');const b=hashPassword('a-valid-test-password');assert.notEqual(a,b);assert.equal(checkPassword('a-valid-test-password',a),true);assert.equal(checkPassword('wrong-password',a),false);assert.equal(digest('session-token'),digest('session-token'));});
