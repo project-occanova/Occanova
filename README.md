@@ -12,11 +12,11 @@ npm run dev
 
 Open http://127.0.0.1:3000. `LOCAL_PREVIEW=true` exposes test-only verification/reset links; never enable it on a public host. Use invented test data. Local records persist in ignored `data/preview.json`.
 
-On Vercel, the app remains read-only until a MongoDB connection variable (`MONGODB_URI`, `ATLAS_URL`, or `MONGODB_URL`) and the Resend variables are configured. Once present, registration, authentication, vendor profiles, enquiries, administration, transactional email and shared rate limiting become writable automatically.
+On Vercel, the app remains read-only until a MongoDB connection variable (`MONGODB_URI`, Vercel Marketplace's `ATLAS_MONGODB_URI`, `ATLAS_URL`, or `MONGODB_URL`) and the Resend variables are configured. Once present, registration, authentication, vendor profiles, enquiries, administration, transactional email and shared rate limiting become writable automatically.
 
 ## Production backend
 
-1. Connect MongoDB Atlas through Vercel (`ATLAS_URL`) or provide the connection string as `MONGODB_URI`/`MONGODB_URL`.
+1. Connect MongoDB Atlas through Vercel (`ATLAS_MONGODB_URI`) or provide the connection string as `MONGODB_URI`/`MONGODB_URL`.
 2. Set `MONGODB_DB=occanova`, `RESEND_API_KEY`, `EMAIL_FROM`, `NEXT_PUBLIC_SITE_URL`, `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
 3. For uploads, set the `S3_*` variables from `.env.example`. Keep the bucket private and allow browser `PUT` requests from the production site origin in its CORS policy.
 4. Run `npm run backend:check`. The first connection creates the normalized collections, indexes, TTL cleanup and seed taxonomy.
