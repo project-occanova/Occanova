@@ -2,7 +2,7 @@ import {backendReady,hasDatabase,hasEmail,hasStorage} from '../src/lib/config';
 import {mongo} from '../src/lib/db';
 import {readState} from '../src/lib/store';
 
-if(!hasDatabase())throw Error('Set MONGODB_URI before running the backend check.');
+if(!hasDatabase())throw Error('Set MONGODB_URI, ATLAS_URL, or MONGODB_URL before running the backend check.');
 const {db}=await mongo();
 await db.command({ping:1});
 const state=await readState();

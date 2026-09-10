@@ -1,15 +1,16 @@
 import {MongoClient,type Db} from 'mongodb';
+import {databaseUrl} from './config';
 
 const globals=globalThis as typeof globalThis&{
   occanovaMongo?:Promise<MongoClient>;
   occanovaIndexes?:Promise<void>;
 };
 
-export function mongoConfigured(){return Boolean(process.env.MONGODB_URI);}
+export function mongoConfigured(){return Boolean(databaseUrl());}
 
 async function client(){
-  const uri=process.env.MONGODB_URI;
-  if(!uri)throw Error('MONGODB_URI is not configured.');
+  const uri=databaseUrl();
+  if(!uri)throw Error('A MongoDB connection URL is not configured.');
   return globals.occanovaMongo??=(new MongoClient(uri,{maxPoolSize:10,serverSelectionTimeoutMS:8000})).connect();
 }
 
