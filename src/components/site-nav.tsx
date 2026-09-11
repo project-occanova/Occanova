@@ -18,7 +18,7 @@ export function MobileNav(){
       <span>Menu</span>{open?<X size={20}/>:<Menu size={20}/>}
     </button>
     {open?<nav id="mobile-navigation" aria-label="Mobile navigation">
-      {links.map(link=><Link key={link.href} className={link.className} href={link.href} onClick={()=>setOpen(false)}><span>{link.label}</span><ArrowUpRight size={16}/></Link>)}
+      {links.map(link=><Link key={link.href} className={link.className} href={link.href} onClick={()=>setTimeout(()=>setOpen(false),0)}><span>{link.label}</span><ArrowUpRight size={16}/></Link>)}
     </nav>:null}
   </div>;
 }
