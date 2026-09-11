@@ -12,7 +12,7 @@ npm run dev
 
 Open http://127.0.0.1:3000. `LOCAL_PREVIEW=true` exposes test-only verification/reset links; never enable it on a public host. Use invented test data. Local records persist in ignored `data/preview.json`.
 
-On Vercel, the app remains read-only until a MongoDB connection variable (`MONGODB_URI`, Vercel Marketplace's `ATLAS_MONGODB_URI`, `ATLAS_URL`, or `MONGODB_URL`) and the Resend variables are configured. Once present, registration, authentication, vendor profiles, enquiries, administration, transactional email and shared rate limiting become writable automatically.
+On Vercel, the app remains read-only until a MongoDB connection variable (`MONGODB_URI`, Vercel Marketplace's `ATLAS_MONGODB_URI`, `ATLAS_URL`, or `MONGODB_URL`) is configured. Database-backed registration, authentication, vendor profiles, enquiries, administration, and shared rate limiting then become writable automatically. Resend adds email verification, password reset, and enquiry notifications; until it is configured, a newly registered vendor receives a one-time verification link in the registration response.
 
 ## Production backend
 
