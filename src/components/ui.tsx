@@ -3,6 +3,7 @@ import {ArrowUpRight,MapPin,BadgeCheck,Camera,Utensils,Flower2,Building2,Calenda
 import type {Vendor,Taxon} from '@/lib/types';
 import {money,isFeatured} from '@/lib/directory';
 import {backendReady,readOnlyDeployment} from '@/lib/config';
+import {MobileNav} from './site-nav';
 
 export const categoryIcons=[Building2,Camera,Utensils,Flower2,CalendarHeart,Sparkles,Music2];
 
@@ -16,12 +17,13 @@ export function Brand(){
 export function Header(){
   return <header className="header"><div className="container nav">
     <Brand/>
-    <nav aria-label="Main navigation">
+    <nav className="desktop-nav" aria-label="Main navigation">
       <Link href="/vendors">Find vendors</Link>
       <Link href="/#how-it-works">How it works</Link>
       <Link href="/register">List your business <ArrowUpRight size={15}/></Link>
       <Link className="button outline small" href="/login">Vendor login</Link>
     </nav>
+    <MobileNav/>
   </div></header>;
 }
 
