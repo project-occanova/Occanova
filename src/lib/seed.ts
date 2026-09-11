@@ -34,9 +34,12 @@ const categories = [
 const defaultService:Record<string,string>={
   'Decoration & Florists':'Wedding and event decorators','Photography & Media':'Photographers','Catering & Food':'Caterers','Venues & Accommodation':'Banquet and wedding halls','Event Planning & Management':'Wedding planners'
 };
+export const indianLocations=[
+  'Pan India','Agra','Ahmedabad','Aizawl','Amritsar','Bengaluru','Bhopal','Bhubaneswar','Chandigarh','Chennai','Coimbatore','Dehradun','Delhi NCR','Faridabad','Gangtok','Ghaziabad','Goa','Gurugram','Guwahati','Gwalior','Hyderabad','Imphal','Indore','Itanagar','Jabalpur','Jaipur','Jalandhar','Jammu','Jamshedpur','Jodhpur','Kanpur','Kochi','Kohima','Kolkata','Kota','Kottayam','Kozhikode','Leh','Lucknow','Ludhiana','Madurai','Mangaluru','Meerut','Mumbai','Mysuru','Nagpur','Nashik','Noida','Patna','Port Blair','Prayagraj','Puducherry','Pune','Raipur','Rajkot','Ranchi','Salem','Shillong','Shimla','Siliguri','Srinagar','Surat','Thane','Thiruvananthapuram','Thrissur','Tiruchirappalli','Tirupati','Udaipur','Vadodara','Varanasi','Vijayawada','Visakhapatnam','Warangal'
+] as const;
 export function initialState():State { return {
   vendors:specs.map((s,i):Vendor=>({id:`sample-${i+1}`,userId:'',name:s[0],slug:slugify(s[0]),owner:'Sample business',category:s[1],service:defaultService[s[1]]||s[1],city:s[2],locations:[s[2]],experience:5+i,description:s[5]+' This is an illustrative listing created to preview the Occanova experience. Replace it with an approved, real vendor before launch.',summary:s[5],price:s[3],phone:'',whatsapp:'',email:'',image:s[4],gallery:[s[4],photos.hero],documents:[],status:'approved',published:true,featured:i<3,priority:i+1,featuredStart:'',featuredEnd:'',remarks:'',sample:true})),
   categories:categories.map(([name,services,phase],position)=>({name,slug:slugify(name),active:phase===1,services:[...services],phase,position:position+1})),
-  locations:['Kochi','Thrissur','Kozhikode'].map((name,position)=>({name,slug:slugify(name),active:true,position:position+1})),
+  locations:indianLocations.map((name,position)=>({name,slug:slugify(name),active:true,position:position+1})),
   users:[],enquiries:[],sessions:[],tokens:[],audit:[],
 }; }

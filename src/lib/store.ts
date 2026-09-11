@@ -24,6 +24,9 @@ function normalize(state:State):State{
   });
   const known=new Set(state.categories.map(x=>x.name));
   state.categories.push(...incoming.filter(x=>!known.has(legacyCategories[x.name]||x.name)).map(x=>({...x,services:x.services?.length?x.services:[x.name],phase:x.phase??2})));
+  const incomingLocations=state.locations??[];
+  const seededLocations=new Set(seeded.locations.map(x=>x.slug));
+  state.locations=[...seeded.locations.map(base=>({...base,...incomingLocations.find(x=>x.slug===base.slug),name:base.name,slug:base.slug})),...incomingLocations.filter(x=>!seededLocations.has(x.slug))];
   state.vendors=(state.vendors??[]).map(v=>{const category=legacyCategories[v.category]||v.category;const service=v.service||state.categories.find(x=>x.name===category)?.services?.[0]||category;return {...v,category,service,documents:v.documents??[]};});
   return state;
 }
@@ -75,11 +78,17 @@ async function ensureMongoSeed(){
     try{
       await session.withTransaction(async()=>{
         const claim=await db.collection<MetaDoc>('meta').updateOne({_id:'state'},{$setOnInsert:{revision:0,initializedAt:new Date()}},{upsert:true,session});
-        if(!claim.upsertedCount)return;
         const seed=initialState();
-        for(const name of collections){
-          const rows=seed[name] as unknown as Record<string,unknown>[];
-          if(rows.length)await db.collection<MongoDoc>(name).insertMany(rows.map((row,i)=>document(name,row,i)),{session});
+        if(claim.upsertedCount){
+          for(const name of collections){
+            const rows=seed[name] as unknown as Record<string,unknown>[];
+            if(rows.length)await db.collection<MongoDoc>(name).insertMany(rows.map((row,i)=>document(name,row,i)),{session});
+          }
+        }else{
+          for(const name of ['categories','locations'] as const){
+            const rows=seed[name] as unknown as Record<string,unknown>[];
+            for(const [i,row] of rows.entries())await db.collection<MongoDoc>(name).updateOne({_id:String(row[keys[name]])},{$setOnInsert:{...row,_order:i}},{upsert:true,session});
+          }
         }
       },{readConcern:{level:'snapshot'},writeConcern:{w:'majority'}});
     }finally{await session.endSession();}
