@@ -13,7 +13,37 @@ body{overflow-x:hidden}
 .table-wrap{overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}
 table{min-width:680px}
 
+@media(max-width:900px){
+  .container{width:calc(100% - 48px)}
+  .vendor-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .directory-layout,.profile-layout{grid-template-columns:1fr}
+  .directory-layout>section,.profile-layout>*{min-width:0}
+  .filter-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+  .filter-form .button{align-self:end;min-height:46px}
+  .auth-layout{grid-template-columns:1fr;gap:28px;max-width:680px;min-height:0;padding-block:48px}
+  .auth-intro{display:grid;grid-template-columns:auto 1fr;column-gap:24px;align-items:center}
+  .auth-intro .full-logo{grid-row:1/3;width:120px;height:120px;margin:0}
+  .auth-intro p{margin-top:8px}
+  .auth-panel{max-width:none}
+  .sidebar{position:static;width:100%;padding:22px 24px;flex-direction:row;flex-wrap:wrap;align-items:center;gap:18px}
+  .sidebar nav{order:3;width:100%;margin:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .sidebar nav a{justify-content:center;text-align:center;min-height:44px;padding:9px}
+  .sidebar-bottom{margin:0 0 0 auto;padding:0;align-items:flex-end;gap:8px}
+  .workspace{display:block}
+  .workspace-content{margin:0;width:100%}
+  .workspace-main{padding:30px 24px}
+  .workspace-header{padding-inline:24px}
+  .stat-grid,.admin-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stat-grid>div{border-bottom:1px solid var(--line)}
+  .stat-grid>div:nth-child(2n){border-right:0}
+  .stat-grid>div:nth-last-child(-n+2){border-bottom:0}
+  .two-panels{grid-template-columns:1fr}
+}
+
 @media(max-width:800px){
+  .container{width:calc(100% - 40px)}
+  .nav nav>a:nth-child(2){display:flex}
+  .nav nav>a{min-height:44px;padding-block:8px}
   .category-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
   .category-row>a,.category-row>a:nth-child(4),.category-row>a:last-child{border:1px solid var(--line);margin:0 -1px -1px 0}
   .directory-layout>section,.profile-layout>*{min-width:0}
@@ -25,11 +55,13 @@ table{min-width:680px}
   .nav>.brand{align-self:center}
   .nav nav{display:grid;grid-template-columns:1fr 1fr;width:100%;gap:8px}
   .nav nav>a{justify-content:center;min-height:42px;text-align:center;padding:7px 5px}
-  .nav nav>a:last-child{grid-column:1/-1}
+  .nav nav>a:last-child{grid-column:auto}
   .hero{min-height:580px}
   .hero h1{font-size:clamp(52px,16vw,64px)}
   .hero-content{padding-top:38px}
   .search-form{max-width:none}
+  input,select,textarea{min-height:44px}
+  .button{min-height:44px}
   .category-row{grid-template-columns:repeat(2,minmax(0,1fr))}
   .category-row>a,.category-row>a:nth-child(4),.category-row>a:last-child{min-height:82px;padding:15px 10px;border:1px solid var(--line);margin:0 -1px -1px 0;text-align:left}
   .section-heading{flex-wrap:wrap}
@@ -39,6 +71,14 @@ table{min-width:680px}
   .table-wrap{width:calc(100% + 40px);margin-inline:-20px;padding-inline:20px}
   .admin-filters .button{width:100%}
   .review-gallery{overflow-x:auto;padding-bottom:8px}
+  .auth-layout{padding-block:34px;gap:24px}
+  .auth-intro{display:block;text-align:left}
+  .auth-intro .full-logo{display:none}
+  .sidebar{padding:20px 16px;gap:14px}
+  .sidebar nav{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sidebar nav a{justify-content:flex-start;text-align:left}
+  .sidebar-bottom{width:100%;margin:0;flex-direction:row;align-items:center;justify-content:space-between;padding-top:4px}
+  .workspace-header{padding-inline:16px}
 }
 
 @media(max-width:380px){
@@ -54,9 +94,11 @@ table{min-width:680px}
   .gallery>a{aspect-ratio:16/10}
   .profile-facts{grid-template-columns:1fr}
   .stat-grid{grid-template-columns:1fr}
-  .stat-grid>div,.stat-grid>div:nth-child(2n){border-right:0}
+  .stat-grid>div,.stat-grid>div:nth-child(2n){border-right:0;border-bottom:1px solid var(--line)}
+  .stat-grid>div:last-child{border-bottom:0}
   .workspace-header{align-items:flex-start;flex-direction:column;gap:4px}
   .workspace-main,.workspace-main .panel{padding-inline:16px}
+  .sidebar nav{grid-template-columns:1fr}
   .admin-filters{display:grid;grid-template-columns:1fr}
   .admin-filters input,.admin-filters select{max-width:none;width:100%}
 }
