@@ -33,7 +33,7 @@ export function Footer(){
       <div><Brand/><p>Good people. Beautiful celebrations across India.</p></div>
       <div><strong>Explore</strong><Link href="/vendors">Find vendors</Link><Link href="/#how-it-works">How it works</Link></div>
       <div><strong>For businesses</strong><Link href="/register">List your business</Link><Link href="/login">Vendor login</Link></div>
-      <div><strong>Occanova</strong><Link href="/privacy">Privacy policy</Link><Link href="/terms">Terms & conditions</Link><Link href="/admin">Admin portal</Link></div>
+      <div><strong>Occanova</strong><Link href="/privacy">Privacy policy</Link><Link href="/terms">Terms & conditions</Link></div>
     </div>
     <div className="container footer-bottom"><span>© {new Date().getFullYear()} Occanova</span><span>Made for moments that matter.</span></div>
   </footer>;

@@ -16,13 +16,19 @@ const contentSecurityPolicy = [
 const config: NextConfig = {
   turbopack: { root: process.cwd() },
   poweredByHeader: false,
-  async headers() { return [{ source: '/(.*)', headers: [
-    { key: 'X-Content-Type-Options', value: 'nosniff' },
-    { key: 'X-Frame-Options', value: 'DENY' },
-    { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-    { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-    { key: 'Content-Security-Policy', value: contentSecurityPolicy },
-    ...(dev ? [] : [{ key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' }]),
-  ]}]; },
+  async headers() { return [
+    { source: '/(.*)', headers: [
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'X-Frame-Options', value: 'DENY' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+      { key: 'Content-Security-Policy', value: contentSecurityPolicy },
+      ...(dev ? [] : [{ key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' }]),
+    ]},
+    { source: '/admin/:path*', headers: [
+      { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive, nosnippet' },
+      { key: 'Cache-Control', value: 'private, no-store, max-age=0' },
+    ]},
+  ]; },
 };
 export default config;

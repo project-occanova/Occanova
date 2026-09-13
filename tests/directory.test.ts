@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {initialState} from '../src/lib/seed';
 import {publicVendors,isFeatured} from '../src/lib/directory';
 import {enquirySchema,profileSchema} from '../src/lib/validation';
-import {hashPassword,checkPassword,digest} from '../src/lib/auth';
+import {hashPassword,checkPassword,digest,portalAllowed} from '../src/lib/auth';
 import {validVendorKey} from '../src/lib/storage';
 import {backendReady,readOnlyDeployment} from '../src/lib/config';
 test('hidden, unapproved and suspended vendors never enter discovery',()=>{const s=initialState();s.vendors[0].published=false;s.vendors[1].status='pending';s.vendors[2].status='suspended';assert.equal(publicVendors(s.vendors).length,5);});
@@ -17,3 +17,4 @@ test('vendor taxonomy contains the twelve supplied categories and Phase 1 priori
 test('vendor profiles require a category specialisation',()=>{const profile={name:'Occanova Test Vendor',owner:'Test Owner',category:'Photography & Media',service:'Photographers',city:'Kochi',experience:5,description:'A sufficiently detailed description for validation.',summary:'A concise summary for this test vendor.',price:25000,phone:'+91 98765 43210',whatsapp:'+91 98765 43210',email:'vendor@example.test'};assert.equal(profileSchema.safeParse(profile).success,true);assert.equal(profileSchema.safeParse({...profile,service:''}).success,false);});
 test('private storage accepts only scoped vendor object keys',()=>{assert.equal(validVendorKey('vendors/550e8400-e29b-41d4-a716-446655440000/document/550e8400-e29b-41d4-a716-446655440001.pdf'),true);assert.equal(validVendorKey('../admin/secrets.pdf'),false);assert.equal(validVendorKey('vendors/user/portfolio/file.svg'),false);});
 test('a production database enables writes without optional email delivery',()=>{const before={vercel:process.env.VERCEL,database:process.env.MONGODB_URI,emailKey:process.env.RESEND_API_KEY,emailFrom:process.env.EMAIL_FROM};try{process.env.VERCEL='1';process.env.MONGODB_URI='mongodb://configured-for-test';delete process.env.RESEND_API_KEY;delete process.env.EMAIL_FROM;assert.equal(backendReady(),true);assert.equal(readOnlyDeployment(),false);}finally{for(const [key,value] of Object.entries({VERCEL:before.vercel,MONGODB_URI:before.database,RESEND_API_KEY:before.emailKey,EMAIL_FROM:before.emailFrom}))if(value===undefined)delete process.env[key];else process.env[key]=value;}});
+test('vendor and administrator credentials stay within their own portals',()=>{assert.equal(portalAllowed('vendor',false),true);assert.equal(portalAllowed('admin',true),true);assert.equal(portalAllowed('admin',false),false);assert.equal(portalAllowed('vendor',true),false);});

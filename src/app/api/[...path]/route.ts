@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { mutate,readState } from '@/lib/store';
-import { currentUser,hashPassword,checkPassword,token,digest,cookieOptions } from '@/lib/auth';
+import { currentUser,hashPassword,checkPassword,token,digest,cookieOptions,portalAllowed } from '@/lib/auth';
 import { registerSchema,enquirySchema,profileSchema } from '@/lib/validation';
 import { slugify,publicVendors } from '@/lib/directory';
 import {backendReady,hasDatabase,hasEmail,hasStorage,localPreview,readOnlyDeployment} from '@/lib/config';
@@ -48,8 +48,9 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
   }
   if(route==='auth/verify') { const value=z.string().length(64).parse(b.token);await mutate(s=>{const t=s.tokens.find(t=>t.hash===digest(value)&&t.kind==='verify'&&t.expires>Date.now());if(!t)throw Error('This verification link has expired or was already used.');s.users.find(u=>u.id===t.userId)!.verified=true;s.tokens=s.tokens.filter(x=>x!==t);});return NextResponse.json({ok:true}); }
   if(route==='auth/login') {
-   const v=z.object({identity:z.string().min(1).max(160),password:z.string().min(1).max(128)}).parse(b);const s=await readState();const user=s.users.find(u=>u.email===v.identity.toLowerCase()||u.phone===v.identity);
+   const v=z.object({identity:z.string().min(1).max(160),password:z.string().min(1).max(128),admin:z.boolean().optional().default(false)}).parse(b);const s=await readState();const user=s.users.find(u=>u.email===v.identity.toLowerCase()||u.phone===v.identity);
    if(!user||!checkPassword(v.password,user.passwordHash))return fail('Email/mobile or password is incorrect.',401);
+   if(!portalAllowed(user.role,v.admin))return fail(v.admin?'Administrator access is required.':'Use the separate administrator sign-in page.',403);
    if(!user.verified)return fail('Verify your email before signing in.',403);
    const t=token();await mutate(s=>{s.sessions=s.sessions.filter(x=>x.expires>Date.now());s.sessions.push({hash:digest(t),userId:user.id,expires:Date.now()+7*86400000});});(await cookies()).set('occanova_session',t,cookieOptions);return NextResponse.json({ok:true,redirect:user.role==='admin'?'/admin':'/dashboard'});
   }
@@ -71,7 +72,7 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
   if(e instanceof z.ZodError)return fail(e.issues[0]?.message??'Check the form fields');
   if(e instanceof SyntaxError)return fail('Invalid JSON');
   if(e&&typeof e==='object'&&'code' in e&&e.code===11000)return fail('An account already uses this email or phone.',409);
-  const safe=['An account already uses','This verification link','Email/mobile or password','Verify your email','This reset link','This vendor is unavailable','Choose an active','Contact Occanova','Current password','Enquiry not found','Access denied','Vendor not found','Featured end','Private file storage','Choose an allowed'];
+  const safe=['An account already uses','This verification link','Email/mobile or password','Verify your email','This reset link','This vendor is unavailable','Choose an active','Contact Occanova','Current password','Enquiry not found','Access denied','Administrator access','Use the separate administrator','Vendor not found','Featured end','Private file storage','Choose an allowed'];
   if(e instanceof Error&&safe.some(x=>e.message.startsWith(x)))return fail(e.message);
   console.error('API request failed',e);return fail('Request failed. Please try again.',500);
  }

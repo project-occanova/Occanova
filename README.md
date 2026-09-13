@@ -36,7 +36,7 @@ The database uses separate collections for vendors, users, enquiries, sessions, 
 
 ## Admin setup
 
-Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters) privately in your terminal environment, then run `npx tsx scripts/create-admin.ts`. No default admin or public credentials are installed. Login at `/login`. Vendor accounts cannot access admin data or controls.
+Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters) privately in your terminal environment, then run `npx tsx scripts/create-admin.ts`. No default admin or public credentials are installed. Administrators sign in through the separate `/admin/login` entry; the public `/login` route accepts vendor accounts only. Vendor accounts cannot access admin data or controls.
 
 ## Checks
 
