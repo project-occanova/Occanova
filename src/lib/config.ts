@@ -3,6 +3,7 @@ export const hasDatabase=()=>Boolean(databaseUrl());
 export const hasEmail=()=>Boolean(process.env.RESEND_API_KEY&&process.env.EMAIL_FROM);
 export const hasStorage=()=>Boolean(process.env.S3_BUCKET&&process.env.S3_REGION&&process.env.S3_ACCESS_KEY_ID&&process.env.S3_SECRET_ACCESS_KEY);
 export const backendReady=()=>hasDatabase();
+export const siteIndexable=()=>process.env.SITE_INDEXABLE==='true';
 export const localPreview=()=>process.env.VERCEL!=='1'&&(process.env.LOCAL_PREVIEW==='true'||process.env.NODE_ENV!=='production');
 export function siteUrl(){
   const vercelHost=process.env.VERCEL_PROJECT_PRODUCTION_URL||process.env.VERCEL_URL;

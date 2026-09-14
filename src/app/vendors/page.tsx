@@ -3,7 +3,7 @@ import {Header,Footer,SearchForm,VendorCard,PreviewNotice} from '@/components/ui
 import {readState} from '@/lib/store';
 import {publicVendors} from '@/lib/directory';
 
-export const metadata={title:'Find event vendors across India'};
+export const metadata={title:'Find event vendors across India',description:'Explore event planners, venues, photographers, caterers, decorators and more across India.',alternates:{canonical:'/vendors'}};
 export const dynamic='force-dynamic';
 
 export default async function Directory({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){

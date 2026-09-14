@@ -17,7 +17,7 @@ On Vercel, the app remains read-only until a MongoDB connection variable (`MONGO
 ## Production backend
 
 1. Connect MongoDB Atlas through Vercel (`ATLAS_MONGODB_URI`) or provide the connection string as `MONGODB_URI`/`MONGODB_URL`.
-2. Set `MONGODB_DB=occanova`, `RESEND_API_KEY`, `EMAIL_FROM`, `NEXT_PUBLIC_SITE_URL`, `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
+2. Set `MONGODB_DB=occanova`, `RESEND_API_KEY`, `EMAIL_FROM`, `NEXT_PUBLIC_SITE_URL`, `ADMIN_EMAIL` and `ADMIN_PASSWORD`. Keep `SITE_INDEXABLE=false` until real vendor content and company-approved legal copy are live, then set it to `true` and redeploy.
 3. For uploads, set the `S3_*` variables from `.env.example`. Keep the bucket private and allow browser `PUT` requests from the production site origin in its CORS policy.
 4. Run `npm run backend:check`. The first connection creates the normalized collections, indexes, TTL cleanup and seed taxonomy.
 5. Run `npx tsx scripts/create-admin.ts` once, then deploy. Keep `LOCAL_PREVIEW` unset or false in production.
@@ -44,7 +44,7 @@ Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters) privately in your termin
 
 ## Remaining Phase 1 work
 
-1. Multiple operating locations per vendor, editable SEO metadata and launch indexing configuration.
+1. Multiple operating locations per vendor and editable per-vendor SEO metadata.
 2. Dedicated soft-delete/reactivate semantics, orphaned-upload cleanup, admin-profile editing and comprehensive release UAT.
 3. Confirm real vendors, prices/contact details, company-approved legal copy and licensed production photography.
 4. Configure production monitoring, MongoDB backup/restore and service ownership handover.
