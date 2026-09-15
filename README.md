@@ -31,8 +31,8 @@ The database uses separate collections for vendors, users, enquiries, sessions, 
 - Validated, consent-based enquiries; vendor and admin enquiry status updates.
 - Vendor registration, local email verification/reset, hashed passwords, revocable HttpOnly sessions, login/logout.
 - Vendor profile save/review submission with up to 25 operating locations; edits remove the existing publication pending review.
-- Protected admin review, approve/reject/suspend/inactivate, publication/Featured controls, taxonomy activation and audit log.
-- Responsive public/vendor/admin interfaces; dynamic public-profile sitemap; draft terms/privacy; preview is blocked from indexing.
+- Protected admin profile editing, review, approve/reject/suspend/inactivate, reversible account deactivation, publication/Featured controls, taxonomy activation and audit log.
+- Responsive public/vendor/admin interfaces; editable vendor SEO, social metadata, structured business data, dynamic public-profile sitemap, draft terms/privacy and launch-safe indexing controls.
 
 ## Admin setup
 
@@ -44,10 +44,9 @@ Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters) privately in your termin
 
 ## Remaining Phase 1 work
 
-1. Editable per-vendor SEO metadata.
-2. Dedicated soft-delete/reactivate semantics, orphaned-upload cleanup, admin-profile editing and comprehensive release UAT.
-3. Confirm real vendors, prices/contact details, company-approved legal copy and licensed production photography.
-4. Configure production monitoring, MongoDB backup/restore and service ownership handover.
+1. Orphaned-upload cleanup and comprehensive release UAT.
+2. Confirm real vendors, prices/contact details, company-approved legal copy and licensed production photography.
+3. Configure production email, private storage, monitoring, MongoDB backup/restore and service ownership handover.
 
 The demonstration cities Kochi, Thrissur and Kozhikode are provisional. Photography is externally hosted illustrative Unsplash content; no claim is made that it belongs to a vendor. No emails, WhatsApp messages, purchases or deployments are performed automatically.
 

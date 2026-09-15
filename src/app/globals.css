@@ -197,6 +197,10 @@ table{min-width:680px}
 .button.danger{background:#8d3f35;border-color:#8d3f35;color:#fff}
 .button.danger:hover{background:#753129;border-color:#753129}
 .document-links{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin:15px 0 24px;font-size:12px;text-decoration:underline}
+.seo-fields{border-top:1px solid var(--line);padding-top:24px}
+.seo-fields>div:first-child{margin-bottom:17px}
+.seo-fields h3{font-size:21px;margin:7px 0}
+.seo-fields p{max-width:620px;font-size:11px;line-height:1.7;color:var(--muted)}
 .location-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin-top:12px;max-height:224px;overflow:auto;border:1px solid var(--line);border-radius:4px;background:var(--line)}
 .location-options label{display:flex;align-items:center;gap:9px;min-height:43px;padding:9px 11px;background:var(--white);font-size:11px;cursor:pointer}
 .location-options label:hover{background:var(--sage)}
