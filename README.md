@@ -30,7 +30,7 @@ The database uses separate collections for vendors, users, enquiries, sessions, 
 - Only approved/published vendors appear; Featured vendors use manual priority and optional dates.
 - Validated, consent-based enquiries; vendor and admin enquiry status updates.
 - Vendor registration, local email verification/reset, hashed passwords, revocable HttpOnly sessions, login/logout.
-- Vendor profile save/review submission; edits remove the existing publication pending review.
+- Vendor profile save/review submission with up to 25 operating locations; edits remove the existing publication pending review.
 - Protected admin review, approve/reject/suspend/inactivate, publication/Featured controls, taxonomy activation and audit log.
 - Responsive public/vendor/admin interfaces; dynamic public-profile sitemap; draft terms/privacy; preview is blocked from indexing.
 
@@ -44,7 +44,7 @@ Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters) privately in your termin
 
 ## Remaining Phase 1 work
 
-1. Multiple operating locations per vendor and editable per-vendor SEO metadata.
+1. Editable per-vendor SEO metadata.
 2. Dedicated soft-delete/reactivate semantics, orphaned-upload cleanup, admin-profile editing and comprehensive release UAT.
 3. Confirm real vendors, prices/contact details, company-approved legal copy and licensed production photography.
 4. Configure production monitoring, MongoDB backup/restore and service ownership handover.
