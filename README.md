@@ -18,11 +18,11 @@ On Vercel, the app remains read-only until a MongoDB connection variable (`MONGO
 
 1. Connect MongoDB Atlas through Vercel (`ATLAS_MONGODB_URI`) or provide the connection string as `MONGODB_URI`/`MONGODB_URL`.
 2. Set `MONGODB_DB=occanova`, `RESEND_API_KEY`, `EMAIL_FROM`, `NEXT_PUBLIC_SITE_URL`, `ADMIN_EMAIL` and `ADMIN_PASSWORD`. Keep `SITE_INDEXABLE=false` until real vendor content and company-approved legal copy are live, then set it to `true` and redeploy.
-3. For uploads, set the `S3_*` variables from `.env.example`. Keep the bucket private and allow browser `PUT` requests from the production site origin in its CORS policy.
+3. For uploads, set the `S3_*` variables and a strong `CRON_SECRET` from `.env.example`. Keep the bucket private and allow browser `PUT` requests from the production site origin in its CORS policy.
 4. Run `npm run backend:check`. The first connection creates the normalized collections, indexes, TTL cleanup and seed taxonomy.
 5. Run `npx tsx scripts/create-admin.ts` once, then deploy. Keep `LOCAL_PREVIEW` unset or false in production.
 
-The database uses separate collections for vendors, users, enquiries, sessions, one-time tokens, categories, locations and audit events. Mutations run in MongoDB transactions; session/token expiry uses TTL indexes. Resend sends verification, password-reset and enquiry emails. S3-compatible storage uses five-minute upload/download URLs, validates file type and size, keeps verification documents private, and serves public portfolio media only for approved listings.
+The database uses separate collections for vendors, users, enquiries, sessions, one-time tokens, categories, locations and audit events. Mutations run in MongoDB transactions; session/token expiry uses TTL indexes. Resend sends verification, password-reset and enquiry emails. S3-compatible storage uses five-minute upload/download URLs, validates file type and size, keeps verification documents private, and serves public portfolio media only for approved listings. Replaced files are deleted after a successful profile save; a protected daily job removes uploads that remain unreferenced for more than 24 hours.
 
 ## Working flows
 
@@ -30,7 +30,7 @@ The database uses separate collections for vendors, users, enquiries, sessions, 
 - Only approved/published vendors appear; Featured vendors use manual priority and optional dates.
 - Validated, consent-based enquiries; vendor and admin enquiry status updates.
 - Vendor registration, local email verification/reset, hashed passwords, revocable HttpOnly sessions, login/logout.
-- Vendor profile save/review submission with up to 25 operating locations; edits remove the existing publication pending review.
+- Vendor profile save/review submission with up to 25 operating locations, removable uploads and automatic orphan cleanup; edits remove the existing publication pending review.
 - Protected admin profile editing, review, approve/reject/suspend/inactivate, reversible account deactivation, publication/Featured controls, taxonomy activation and audit log.
 - Responsive public/vendor/admin interfaces; editable vendor SEO, social metadata, structured business data, dynamic public-profile sitemap, draft terms/privacy and launch-safe indexing controls.
 
@@ -40,11 +40,11 @@ Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters) privately in your termin
 
 ## Checks
 
-`npm run typecheck`, `npm test`, `npm run build`.
+`npm run typecheck`, `npm test`, `npm run build`. Use `npm run release:check` for a compact production smoke test; set `SITE_URL` to check another deployment and `EXPECT_INDEXABLE=true` only after the launch switch is enabled.
 
 ## Remaining Phase 1 work
 
-1. Orphaned-upload cleanup and comprehensive release UAT.
+1. Comprehensive release UAT with the approved production content and configured external services.
 2. Confirm real vendors, prices/contact details, company-approved legal copy and licensed production photography.
 3. Configure production email, private storage, monitoring, MongoDB backup/restore and service ownership handover.
 

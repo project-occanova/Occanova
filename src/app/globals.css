@@ -197,6 +197,7 @@ table{min-width:680px}
 .button.danger{background:#8d3f35;border-color:#8d3f35;color:#fff}
 .button.danger:hover{background:#753129;border-color:#753129}
 .document-links{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin:15px 0 24px;font-size:12px;text-decoration:underline}
+.upload-control{display:flex;flex-direction:column;gap:10px;min-width:0}.upload-items{display:flex;flex-wrap:wrap;gap:7px}.upload-remove{align-self:flex-start;border:1px solid #ccd5c2;background:#f7f8f1;color:var(--green);border-radius:3px;padding:6px 9px;font-size:10px}.upload-remove:hover{background:var(--sage)}
 .seo-fields{border-top:1px solid var(--line);padding-top:24px}
 .seo-fields>div:first-child{margin-bottom:17px}
 .seo-fields h3{font-size:21px;margin:7px 0}
