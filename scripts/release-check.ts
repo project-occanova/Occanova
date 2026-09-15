@@ -1,7 +1,7 @@
 const base=(process.env.SITE_URL||'https://www.occanova.com').replace(/\/$/,'');
 
 async function request(path:string){
-  const response=await fetch(base+path,{redirect:'follow',signal:AbortSignal.timeout(20_000)});
+  const response=await fetch(base+path,{redirect:'follow',signal:AbortSignal.timeout(45_000)});
   if(!response.ok)throw Error(`${path} returned ${response.status}`);
   return response;
 }
