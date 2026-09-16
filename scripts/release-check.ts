@@ -15,6 +15,7 @@ async function main(){
   const expectedIndexable=process.env.EXPECT_INDEXABLE==='true';
   const expectedIntake=process.env.EXPECT_INTAKE==='true';
   if(expectedIndexable===/^Disallow:\s*\/\s*$/m.test(robotsText))throw Error(`robots.txt does not match EXPECT_INDEXABLE=${expectedIndexable}.`);
+  if(typeof health.intake!=='boolean')throw Error('Deployment does not expose the public-intake release marker yet.');
   if(Boolean(health.intake)!==expectedIntake)throw Error(`Public intake does not match EXPECT_INTAKE=${expectedIntake}.`);
   const vendors=await vendorsResponse.json() as Record<string,unknown>[];
   if(!Array.isArray(vendors))throw Error('Vendor directory API did not return a list.');
