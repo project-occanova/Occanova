@@ -33,6 +33,7 @@ The database uses separate collections for vendors, users, enquiries, sessions, 
 - Vendor profile save/review submission with up to 25 operating locations, removable uploads and automatic orphan cleanup; edits remove the existing publication pending review.
 - Protected admin profile editing, review, approve/reject/suspend/inactivate, reversible account deactivation, publication/Featured controls, taxonomy activation and audit log.
 - Responsive public/vendor/admin interfaces; editable vendor SEO, social metadata, structured business data, dynamic public-profile sitemap, draft terms/privacy and launch-safe indexing controls.
+- Public API and enquiry forms use explicit field allowlists; enquiry tables receive only the vendor names needed for their authorized rows. Private media redirects use `private, no-store`.
 
 ## Admin setup
 

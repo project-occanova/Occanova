@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { mutate,readState } from '@/lib/store';
 import { currentUser,hashPassword,checkPassword,token,digest,cookieOptions,portalAllowed } from '@/lib/auth';
 import { registerSchema,enquirySchema,profileSchema,adminVendorProfileSchema,vendorLifecycleSchema } from '@/lib/validation';
-import { slugify,publicVendors } from '@/lib/directory';
+import { slugify,publicVendors,publicVendorProfile } from '@/lib/directory';
 import {backendReady,hasDatabase,hasEmail,hasStorage,localPreview,readOnlyDeployment} from '@/lib/config';
 import {rateLimited} from '@/lib/rate-limit';
 import {sendEnquiryNotifications,sendResetEmail,sendVerificationEmail} from '@/lib/email';
@@ -29,9 +29,9 @@ export async function GET(req:NextRequest,{params}:{params:Promise<{path:string[
   const [,ownerId,kind]=key.split('/');const user=await currentUser();const vendor=s.vendors.find(x=>x.userId===ownerId);const privileged=user&&(user.role==='admin'||user.id===ownerId);
   if(kind==='document'&&!privileged)return fail('Access denied',403);
   const path=`/api/media?key=${encodeURIComponent(key)}`;if(!privileged&&!(vendor?.status==='approved'&&vendor.published&&(vendor.image===path||vendor.gallery.includes(path))))return fail('File not found',404);
-  return NextResponse.redirect(await createDownload(key),302);
+  const response=NextResponse.redirect(await createDownload(key),302);response.headers.set('Cache-Control','private, no-store');return response;
  }
- if(route==='vendors')return NextResponse.json(publicVendors(s.vendors,Object.fromEntries(req.nextUrl.searchParams)).map(({userId,remarks,owner,...publicProfile})=>publicProfile));
+ if(route==='vendors')return NextResponse.json(publicVendors(s.vendors,Object.fromEntries(req.nextUrl.searchParams)).map(publicVendorProfile));
  return fail('Not found',404);
 }
 export async function POST(req:NextRequest,{params}:{params:Promise<{path:string[]}>}) {
