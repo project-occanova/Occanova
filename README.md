@@ -12,12 +12,12 @@ npm run dev
 
 Open http://127.0.0.1:3000. `LOCAL_PREVIEW=true` exposes test-only verification/reset links; never enable it on a public host. Use invented test data. Local records persist in ignored `data/preview.json`.
 
-On Vercel, the app remains read-only until a MongoDB connection variable (`MONGODB_URI`, Vercel Marketplace's `ATLAS_MONGODB_URI`, `ATLAS_URL`, or `MONGODB_URL`) is configured. Database-backed registration, authentication, vendor profiles, enquiries, administration, and shared rate limiting then become writable automatically. Resend adds email verification, password reset, and enquiry notifications; until it is configured, a newly registered vendor receives a one-time verification link in the registration response.
+On Vercel, the app remains read-only until a MongoDB connection variable (`MONGODB_URI`, Vercel Marketplace's `ATLAS_MONGODB_URI`, `ATLAS_URL`, or `MONGODB_URL`) is configured. Existing account access, vendor profiles, administration and shared rate limiting then become writable. Public registration and enquiries also require Resend plus the explicit `PUBLIC_INTAKE_ENABLED=true` launch switch.
 
 ## Production backend
 
 1. Connect MongoDB Atlas through Vercel (`ATLAS_MONGODB_URI`) or provide the connection string as `MONGODB_URI`/`MONGODB_URL`.
-2. Set `MONGODB_DB=occanova`, `RESEND_API_KEY`, `EMAIL_FROM`, `NEXT_PUBLIC_SITE_URL`, `ADMIN_EMAIL` and `ADMIN_PASSWORD`. Keep `SITE_INDEXABLE=false` until real vendor content and company-approved legal copy are live, then set it to `true` and redeploy.
+2. Set `MONGODB_DB=occanova`, `RESEND_API_KEY`, `EMAIL_FROM`, `NEXT_PUBLIC_SITE_URL`, `ADMIN_EMAIL` and `ADMIN_PASSWORD`. Keep `PUBLIC_INTAKE_ENABLED=false` and `SITE_INDEXABLE=false` until real vendor content and company-approved legal copy are live. Set each switch to `true` only after its launch review and redeploy.
 3. For uploads, set the `S3_*` variables and a strong `CRON_SECRET` from `.env.example`. Keep the bucket private and allow browser `PUT` requests from the production site origin in its CORS policy.
 4. Run `npm run backend:check`. The first connection creates the normalized collections, indexes, TTL cleanup and seed taxonomy.
 5. Run `npx tsx scripts/create-admin.ts` once, then deploy. Keep `LOCAL_PREVIEW` unset or false in production.
@@ -41,7 +41,7 @@ Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters) privately in your termin
 
 ## Checks
 
-`npm run typecheck`, `npm test`, `npm run build`. Use `npm run release:check` for a compact production smoke test; set `SITE_URL` to check another deployment and `EXPECT_INDEXABLE=true` only after the launch switch is enabled.
+`npm run typecheck`, `npm test`, `npm run build`. Use `npm run release:check` for a compact production smoke test; set `SITE_URL` to check another deployment. Set `EXPECT_INTAKE=true` and `EXPECT_INDEXABLE=true` only after their corresponding launch switches are enabled.
 
 ## Remaining Phase 1 work
 
@@ -49,7 +49,7 @@ Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters) privately in your termin
 2. Confirm real vendors, prices/contact details, company-approved legal copy and licensed production photography.
 3. Configure production email, private storage, monitoring, MongoDB backup/restore and service ownership handover.
 
-The demonstration cities Kochi, Thrissur and Kozhikode are provisional. Photography is externally hosted illustrative Unsplash content; no claim is made that it belongs to a vendor. No emails, WhatsApp messages, purchases or deployments are performed automatically.
+The demonstration cities Kochi, Thrissur and Kozhikode are provisional. Photography is externally hosted illustrative Unsplash content; no claim is made that it belongs to a vendor. Sample listings cannot receive enquiries. No emails, WhatsApp messages or purchases are performed automatically.
 
 ## Architecture and consumption
 

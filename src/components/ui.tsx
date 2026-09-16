@@ -2,7 +2,7 @@ import Link from 'next/link';
 import {ArrowUpRight,MapPin,BadgeCheck,Camera,Utensils,Flower2,Building2,CalendarHeart,Sparkles,Music2} from 'lucide-react';
 import type {Vendor,Taxon} from '@/lib/types';
 import {money,isFeatured} from '@/lib/directory';
-import {backendReady,readOnlyDeployment} from '@/lib/config';
+import {backendReady,publicIntakeEnabled,readOnlyDeployment} from '@/lib/config';
 import {MobileNav} from './site-nav';
 
 export const categoryIcons=[Building2,Camera,Utensils,Flower2,CalendarHeart,Sparkles,Music2];
@@ -63,6 +63,6 @@ export function VendorCard({vendor:v,list=false}:{vendor:Vendor;list?:boolean}){
 
 export function PreviewNotice(){
   const hosted=process.env.VERCEL==='1';
-  const copy=readOnlyDeployment()?'Public preview · Read-only experience':hosted&&backendReady()?'Production backend connected':'Local preview';
+  const copy=readOnlyDeployment()?'Public preview · Read-only experience':hosted&&backendReady()&&!publicIntakeEnabled()?'Launch preview · Registration and enquiries are closed':hosted&&backendReady()?'Production backend connected':'Local preview';
   return <div className="preview-notice">{copy} · Illustrative listings and photography</div>;
 }

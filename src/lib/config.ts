@@ -5,6 +5,7 @@ export const hasStorage=()=>Boolean(process.env.S3_BUCKET&&process.env.S3_REGION
 export const backendReady=()=>hasDatabase();
 export const siteIndexable=()=>process.env.SITE_INDEXABLE==='true';
 export const localPreview=()=>process.env.VERCEL!=='1'&&(process.env.LOCAL_PREVIEW==='true'||process.env.NODE_ENV!=='production');
+export const publicIntakeEnabled=()=>localPreview()||(backendReady()&&hasEmail()&&process.env.PUBLIC_INTAKE_ENABLED==='true');
 export function siteUrl(){
   const vercelHost=process.env.VERCEL_PROJECT_PRODUCTION_URL||process.env.VERCEL_URL;
   return (process.env.NEXT_PUBLIC_SITE_URL||(vercelHost?`https://${vercelHost}`:'http://localhost:3000')).replace(/\/$/,'');
