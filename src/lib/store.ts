@@ -45,8 +45,15 @@ function clean<T>(doc:MongoDoc):T{
 async function mongoRead(session?:ClientSession):Promise<State>{
   const {db}=await mongo();
   const result={} as State;
-  for(const name of collections){
-    const docs=await db.collection<MongoDoc>(name).find({}, {session}).sort({_order:1}).toArray();
+  // A session transaction must keep its operations sequential; ordinary reads can overlap.
+  const lists:MongoDoc[][]=[];
+  if(session){
+    for(const name of collections)lists.push(await db.collection<MongoDoc>(name).find({}, {session}).sort({_order:1}).toArray());
+  }else{
+    lists.push(...await Promise.all(collections.map(name=>db.collection<MongoDoc>(name).find({}).sort({_order:1}).toArray())));
+  }
+  for(const [index,name] of collections.entries()){
+    const docs=lists[index];
     (result[name] as unknown[]) = docs.map(clean);
   }
   return normalize(result);
@@ -87,7 +94,9 @@ async function ensureMongoSeed(){
         }else{
           for(const name of ['categories','locations'] as const){
             const rows=seed[name] as unknown as Record<string,unknown>[];
-            for(const [i,row] of rows.entries())await db.collection<MongoDoc>(name).updateOne({_id:String(row[keys[name]])},{$setOnInsert:{...row,_order:i}},{upsert:true,session});
+            await db.collection<MongoDoc>(name).bulkWrite(rows.map((row,i)=>({updateOne:{
+              filter:{_id:String(row[keys[name]])},update:{$setOnInsert:{...row,_order:i}},upsert:true,
+            }})),{session});
           }
         }
       },{readConcern:{level:'snapshot'},writeConcern:{w:'majority'}});
