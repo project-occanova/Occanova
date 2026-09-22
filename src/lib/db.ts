@@ -5,6 +5,8 @@ const globals=globalThis as typeof globalThis&{
   occanovaMongo?:Promise<MongoClient>;
   occanovaIndexes?:Promise<void>;
 };
+// Increment when createIndexes changes so existing databases receive new indexes.
+const indexVersion=1;
 
 export function mongoConfigured(){return Boolean(databaseUrl());}
 
@@ -31,7 +33,12 @@ async function createIndexes(db:Db){
 export async function mongo(){
   const connected=await client();
   const db=connected.db(process.env.MONGODB_DB||'occanova');
-  globals.occanovaIndexes??=createIndexes(db);
+  globals.occanovaIndexes??=(async()=>{
+    const meta=db.collection<{_id:string;version:number}>('meta');
+    if((await meta.findOne({_id:'indexes'}))?.version===indexVersion)return;
+    await createIndexes(db);
+    await meta.updateOne({_id:'indexes'},{$set:{version:indexVersion}},{upsert:true});
+  })();
   await globals.occanovaIndexes;
   return {client:connected,db};
 }

@@ -9,7 +9,9 @@ const file=path.join(process.cwd(),'data','preview.json');
 const globals=globalThis as typeof globalThis&{occanovaQueue?:Promise<unknown>;occanovaSeed?:Promise<void>};
 type StateList=keyof State;
 type MongoDoc={_id:string;[key:string]:unknown};
-type MetaDoc={_id:string;revision:number;initializedAt?:Date};
+type MetaDoc={_id:string;revision:number;initializedAt?:Date;seedVersion?:number};
+// Increment when the default categories or locations need to be merged again.
+const seedVersion=1;
 const collections:StateList[]=['vendors','users','enquiries','sessions','tokens','categories','locations','audit'];
 const keys:Record<StateList,string>={vendors:'id',users:'id',enquiries:'id',sessions:'hash',tokens:'hash',categories:'slug',locations:'slug',audit:'id'};
 const legacyCategories:Record<string,string>={'Venues':'Venues & Accommodation','Photography':'Photography & Media','Catering':'Catering & Food','Decor & Styling':'Decoration & Florists','Event Planners':'Event Planning & Management','Makeup & Beauty':'Makeup, Fashion & Styling','Music & Entertainment':'Artists & Entertainment'};
@@ -81,10 +83,13 @@ async function writeList(name:StateList,before:Record<string,unknown>[],after:Re
 
 async function ensureMongoSeed(){
   globals.occanovaSeed??=(async()=>{
-    const {client,db}=await mongo();const session=client.startSession();
+    const {client,db}=await mongo();
+    const meta=db.collection<MetaDoc>('meta');
+    if((await meta.findOne({_id:'state'},{projection:{seedVersion:1}}))?.seedVersion===seedVersion)return;
+    const session=client.startSession();
     try{
       await session.withTransaction(async()=>{
-        const claim=await db.collection<MetaDoc>('meta').updateOne({_id:'state'},{$setOnInsert:{revision:0,initializedAt:new Date()}},{upsert:true,session});
+        const claim=await meta.updateOne({_id:'state'},{$setOnInsert:{revision:0,initializedAt:new Date()}},{upsert:true,session});
         const seed=initialState();
         if(claim.upsertedCount){
           for(const name of collections){
@@ -99,6 +104,7 @@ async function ensureMongoSeed(){
             }})),{session});
           }
         }
+        await meta.updateOne({_id:'state'},{$set:{seedVersion}},{session});
       },{readConcern:{level:'snapshot'},writeConcern:{w:'majority'}});
     }finally{await session.endSession();}
   })();
