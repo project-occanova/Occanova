@@ -5,7 +5,8 @@ import {readState} from '@/lib/store';
 import {publicVendors,isFeatured} from '@/lib/directory';
 import {photos} from '@/lib/seed';
 
-export const dynamic='force-dynamic';
+// Public discovery data may be one minute old in exchange for an instant CDN response.
+export const revalidate=60;
 
 export default async function Home(){
   const s=await readState();
