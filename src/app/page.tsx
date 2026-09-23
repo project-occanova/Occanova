@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import {ArrowUpRight,ArrowRight} from 'lucide-react';
-import {Header,Footer,SearchForm,VendorCard,categoryIcons,PreviewNotice} from '@/components/ui';
+import {Header,Footer,SearchForm,VendorCard,PreviewNotice} from '@/components/ui';
+import {categoryIconFor} from '@/components/category-icons';
 import {readState} from '@/lib/store';
 import {publicVendors,isFeatured} from '@/lib/directory';
 import {photos} from '@/lib/seed';
@@ -25,7 +26,7 @@ export default async function Home(){
       </section>
       <section className="container categories-section">
         <div className="section-heading"><h2>A little inspiration.<br className="mobile-only"/> A place to begin.</h2><Link href="/vendors">Explore all vendors <ArrowUpRight size={17}/></Link></div>
-        <div className="category-row">{s.categories.filter(x=>x.active).map((c,i)=>{const Icon=categoryIcons[i%categoryIcons.length];return <Link key={c.slug} href={`/category/${c.slug}`}><Icon size={29} strokeWidth={1.25}/><span>{c.name}</span><ArrowUpRight className="category-arrow" size={14}/></Link>;})}</div>
+        <div className="category-row">{s.categories.filter(x=>x.active).map(c=>{const Icon=categoryIconFor(c.slug);return <Link key={c.slug} href={`/category/${c.slug}`}><Icon size={29} strokeWidth={1.25} aria-hidden="true"/><span>{c.name}</span><ArrowUpRight className="category-arrow" size={14}/></Link>;})}</div>
       </section>
       <section className="featured-section">
         <div className="container">

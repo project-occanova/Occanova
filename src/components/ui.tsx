@@ -1,11 +1,9 @@
 import Link from 'next/link';
-import {ArrowUpRight,MapPin,BadgeCheck,Camera,Utensils,Flower2,Building2,CalendarHeart,Sparkles,Music2} from 'lucide-react';
+import {ArrowUpRight,MapPin,BadgeCheck,Sparkles} from 'lucide-react';
 import type {Vendor,Taxon} from '@/lib/types';
 import {money,isFeatured} from '@/lib/directory';
 import {backendReady,publicIntakeEnabled,readOnlyDeployment} from '@/lib/config';
 import {MobileNav} from './site-nav';
-
-export const categoryIcons=[Building2,Camera,Utensils,Flower2,CalendarHeart,Sparkles,Music2];
 
 export function Brand(){
   return <Link href="/" className="brand" aria-label="Occanova home">
