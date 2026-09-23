@@ -10,7 +10,6 @@ export const dynamic='force-dynamic';
 export default async function AdminLogin(){
   const user=await currentUser();
   if(user?.role==='admin')redirect('/admin');
-  if(user)redirect('/dashboard');
   return <main id="main" className="admin-login-shell">
     <section className="admin-login-brand">
       <Link href="/" className="admin-login-wordmark">OCCANOVA</Link>
@@ -27,7 +26,7 @@ export default async function AdminLogin(){
         <span className="admin-login-icon"><LockKeyhole size={22}/></span>
         <span className="section-label">ADMINISTRATION</span>
         <h2>Sign in to Admin Studio</h2>
-        <p>Use your administrator credentials to continue.</p>
+        <p>{user?.role==='vendor'?'You are signed in as a vendor. Enter administrator credentials to switch to Admin Studio.':'Use your administrator credentials to continue.'}</p>
         {readOnlyDeployment()?<div className="notice">Administration is temporarily unavailable while the database is being connected.</div>:<AdminLoginForm/>}
       </div>
     </section>
