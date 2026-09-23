@@ -5,7 +5,7 @@ const contentSecurityPolicy = [
   `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
-  "img-src 'self' data: https://images.unsplash.com",
+  "img-src 'self' data: https://images.unsplash.com https://*.r2.cloudflarestorage.com",
   "connect-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
