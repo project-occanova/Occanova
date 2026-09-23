@@ -6,9 +6,9 @@ import type {Vendor} from './types';
 
 const globals=globalThis as typeof globalThis&{occanovaS3?:S3Client};
 const allowed={
-  logo:{types:['image/jpeg','image/png','image/webp'],max:5_000_000},
-  portfolio:{types:['image/jpeg','image/png','image/webp'],max:8_000_000},
-  document:{types:['application/pdf','image/jpeg','image/png'],max:10_000_000},
+  logo:{types:['image/jpeg','image/png','image/webp'],max:4_000_000},
+  portfolio:{types:['image/jpeg','image/png','image/webp'],max:4_000_000},
+  document:{types:['application/pdf','image/jpeg','image/png'],max:4_000_000},
 } as const;
 export type UploadKind=keyof typeof allowed;
 
@@ -25,11 +25,6 @@ function uploadTarget(userId:string,kind:UploadKind,type:string,size:number){
   const policy=allowed[kind];if(!policy.types.includes(type as never)||size<1||size>policy.max)throw Error(`Choose an allowed ${kind} file within ${Math.floor(policy.max/1_000_000)} MB.`);
   const {bucket}=settings();const key=`vendors/${userId}/${kind}/${randomUUID()}.${extensions[type]}`;
   return {bucket,key,path:`/api/media?key=${encodeURIComponent(key)}`};
-}
-export async function createUpload(userId:string,kind:UploadKind,type:string,size:number){
-  const {bucket,key,path}=uploadTarget(userId,kind,type,size);
-  const uploadUrl=await getSignedUrl(client(),new PutObjectCommand({Bucket:bucket,Key:key,ContentType:type,ContentLength:size}),{expiresIn:300});
-  return {key,uploadUrl,path};
 }
 export async function storeUpload(userId:string,kind:UploadKind,type:string,size:number,body:Uint8Array){
   const {bucket,key,path}=uploadTarget(userId,kind,type,size);
