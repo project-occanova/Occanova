@@ -3,11 +3,13 @@ import {redirect} from 'next/navigation';
 import {ArrowLeft,LockKeyhole} from 'lucide-react';
 import {AdminLoginForm} from '@/components/forms';
 import {currentUser} from '@/lib/auth';
+import {ensureConfiguredAdmin} from '@/lib/admin-bootstrap';
 import {readOnlyDeployment} from '@/lib/config';
 
 export const dynamic='force-dynamic';
 
 export default async function AdminLogin(){
+  const adminReady=await ensureConfiguredAdmin();
   const user=await currentUser();
   if(user?.role==='admin')redirect('/admin');
   return <main id="main" className="admin-login-shell">
@@ -27,7 +29,7 @@ export default async function AdminLogin(){
         <span className="section-label">ADMINISTRATION</span>
         <h2>Sign in to Admin Studio</h2>
         <p>{user?.role==='vendor'?'You are signed in as a vendor. Enter administrator credentials to switch to Admin Studio.':'Use your administrator credentials to continue.'}</p>
-        {readOnlyDeployment()?<div className="notice">Administration is temporarily unavailable while the database is being connected.</div>:<AdminLoginForm/>}
+        {readOnlyDeployment()?<div className="notice">Administration is temporarily unavailable while the database is being connected.</div>:adminReady?<AdminLoginForm/>:<div className="notice">The administrator account is not configured yet.</div>}
       </div>
     </section>
   </main>;

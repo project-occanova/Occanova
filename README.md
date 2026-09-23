@@ -20,7 +20,7 @@ On Vercel, the app remains read-only until a MongoDB connection variable (`MONGO
 2. Set `MONGODB_DB=occanova`, `RESEND_API_KEY`, `EMAIL_FROM`, `NEXT_PUBLIC_SITE_URL`, `ADMIN_EMAIL` and `ADMIN_PASSWORD`. Keep `PUBLIC_INTAKE_ENABLED=false` and `SITE_INDEXABLE=false` until real vendor content and company-approved legal copy are live. Set each switch to `true` only after its launch review and redeploy.
 3. For uploads, set the `S3_*` variables and a strong `CRON_SECRET` from `.env.example`. Keep the bucket private and allow browser `PUT` requests from the production site origin in its CORS policy.
 4. Run `npm run backend:check`. The first connection creates the normalized collections, indexes, TTL cleanup and seed taxonomy.
-5. Run `npx tsx scripts/create-admin.ts` once, then deploy. Keep `LOCAL_PREVIEW` unset or false in production.
+5. Visit `/admin/login` after deployment. The configured administrator is provisioned on first access. Keep `LOCAL_PREVIEW` unset or false in production.
 
 The database uses separate collections for vendors, users, enquiries, sessions, one-time tokens, categories, locations and audit events. Mutations run in MongoDB transactions; session/token expiry uses TTL indexes. Resend sends verification, password-reset and enquiry emails. S3-compatible storage uses five-minute upload/download URLs, validates file type and size, keeps verification documents private, and serves public portfolio media only for approved listings. Replaced files are deleted after a successful profile save; a protected daily job removes uploads that remain unreferenced for more than 24 hours.
 
@@ -37,7 +37,7 @@ The database uses separate collections for vendors, users, enquiries, sessions, 
 
 ## Admin setup
 
-Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters) privately in your terminal environment, then run `npx tsx scripts/create-admin.ts`. No default admin or public credentials are installed. Administrators sign in through the separate `/admin/login` entry; the public `/login` route accepts vendor accounts only. Vendor accounts cannot access admin data or controls.
+Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters) as protected production variables. The configured administrator is provisioned on the first `/admin/login` request; the script remains available for manual environments. No default or public credentials are installed. Administrators sign in through the separate `/admin/login` entry, and can use the email reset flow when the original secret is unavailable. The public `/login` route accepts vendor accounts only. Vendor accounts cannot access admin data or controls.
 
 ## Checks
 
