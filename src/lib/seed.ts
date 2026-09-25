@@ -30,6 +30,9 @@ const categories = [
   ['Invitations, Printing & Gifts',['Invitation-card designers','Printing businesses','Digital invitation designers','Signage and banner printers','Gift and hamper providers','Wedding-favour vendors','Trophy and certificate providers','Personalised merchandise businesses'],2],
   ['Transportation & Logistics',['Wedding-car rentals','Bus and traveller rentals','Taxi services','Luxury-car providers','Logistics providers','Equipment-transport providers','Valet-parking services'],2],
   ['Event Support Services',['Security agencies','Bouncers','Ushers and event staff','Cleaning services','Electricians','Event insurance providers','First-aid and ambulance services','Technical-support teams'],2],
+  ['Bands',['Gospel/Worship','Rock','Pop','Indie','Jazz','Blues','Folk/Traditional','Classical','Cover/Party','Other'],2],
+  ['Solo Artists',['Singers','Solo performers'],2],
+  ['Solo Musicians',['Drummer','Guitarist','Keyboardist','Bassist','Other instruments'],2],
 ] as const;
 const defaultService:Record<string,string>={
   'Decoration & Florists':'Wedding and event decorators','Photography & Media':'Photographers','Catering & Food':'Caterers','Venues & Accommodation':'Banquet and wedding halls','Event Planning & Management':'Wedding planners'

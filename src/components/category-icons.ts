@@ -4,8 +4,11 @@ import {
   Building2,
   CalendarCheck2,
   Camera,
+  Drum,
   Flower2,
   Gift,
+  Guitar,
+  Mic,
   Mic2,
   Shapes,
   ShieldCheck,
@@ -28,6 +31,9 @@ export const categoryIconsBySlug: Record<string, LucideIcon> = {
   'invitations-printing-gifts': Gift,
   'transportation-logistics': Truck,
   'event-support-services': ShieldCheck,
+  'bands': Guitar,
+  'solo-artists': Mic,
+  'solo-musicians': Drum,
 };
 
 export function categoryIconFor(slug: string): LucideIcon {

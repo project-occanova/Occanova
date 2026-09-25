@@ -11,7 +11,7 @@ type StateList=keyof State;
 type MongoDoc={_id:string;[key:string]:unknown};
 type MetaDoc={_id:string;revision:number;initializedAt?:Date;seedVersion?:number};
 // Increment when the default categories or locations need to be merged again.
-const seedVersion=2;
+const seedVersion=3;
 const collections:StateList[]=['vendors','users','enquiries','sessions','tokens','categories','locations','audit'];
 const keys:Record<StateList,string>={vendors:'id',users:'id',enquiries:'id',sessions:'hash',tokens:'hash',categories:'slug',locations:'slug',audit:'id'};
 const legacyCategories:Record<string,string>={'Venues':'Venues & Accommodation','Photography':'Photography & Media','Catering':'Catering & Food','Decor & Styling':'Decoration & Florists','Event Planners':'Event Planning & Management','Makeup & Beauty':'Makeup, Fashion & Styling','Music & Entertainment':'Artists & Entertainment'};
@@ -100,7 +100,7 @@ async function ensureMongoSeed(){
         }else{
           const categoryRows=seed.categories as unknown as Record<string,unknown>[];
           await db.collection<MongoDoc>('categories').bulkWrite(categoryRows.map((row,i)=>({updateOne:{
-            filter:{_id:String(row.slug)},update:{$set:{...row,_order:i}},upsert:true,
+            filter:{_id:String(row.slug)},update:{$setOnInsert:{...row,_order:i}},upsert:true,
           }})),{session});
           const locationRows=seed.locations as unknown as Record<string,unknown>[];
           await db.collection<MongoDoc>('locations').bulkWrite(locationRows.map((row,i)=>({updateOne:{
