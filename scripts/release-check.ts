@@ -8,7 +8,7 @@ async function request(path:string){
 
 async function main(){
   const [home,directory,healthResponse,robots,vendorsResponse]=await Promise.all([request('/'),request('/vendors'),request('/api/health'),request('/robots.txt'),request('/api/vendors')]);
-  const health=await healthResponse.json() as {ok?:boolean;database?:boolean;writable?:boolean;email?:boolean;storage?:boolean;intake?:boolean};
+  const health=await healthResponse.json() as {ok?:boolean;database?:boolean;writable?:boolean;email?:boolean;mobileOtp?:boolean;storage?:boolean;intake?:boolean};
   const [homeText,directoryText,robotsText]=await Promise.all([home.text(),directory.text(),robots.text()]);
   if(!homeText.includes('Occanova')||!directoryText.includes('Find your kind of people.'))throw Error('Public page content marker is missing.');
   if(!health.ok||!health.database||!health.writable)throw Error(`Backend is unhealthy: ${JSON.stringify(health)}`);
@@ -28,7 +28,7 @@ async function main(){
     if(!html.includes('application/ld+json'))throw Error('Vendor structured data is missing.');
     if(/\\?"(?:documents|remarks|userId)\\?":/.test(html))throw Error('Private vendor fields appeared in the public profile payload.');
   }
-  console.log(JSON.stringify({ok:true,base,database:health.database,writable:health.writable,email:health.email,storage:health.storage,intake:health.intake,indexable:expectedIndexable}));
+  console.log(JSON.stringify({ok:true,base,database:health.database,writable:health.writable,email:health.email,mobileOtp:health.mobileOtp,storage:health.storage,intake:health.intake,indexable:expectedIndexable}));
 }
 
 main().catch(error=>{console.error(error instanceof Error?error.message:error);process.exitCode=1;});

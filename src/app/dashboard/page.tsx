@@ -2,10 +2,10 @@ import Link from 'next/link';
 import {ArrowRight,CheckCircle2,Circle} from 'lucide-react';
 import {redirect} from 'next/navigation';
 import {currentUser} from '@/lib/auth';
-import {hasStorage} from '@/lib/config';
+import {hasStorage,mobileOtpEnabled} from '@/lib/config';
 import {enquiryVendorNames} from '@/lib/directory';
 import {readState} from '@/lib/store';
-import {EnquiryTable,PasswordForm,ProfileForm} from '@/components/forms';
+import {EnquiryTable,MobileVerification,PasswordForm,ProfileForm} from '@/components/forms';
 import {Workspace} from '@/components/workspace';
 
 export const metadata={robots:{index:false,follow:false,noarchive:true}};
@@ -24,6 +24,7 @@ export default async function Dashboard(){
     ['Coverage',!!(v?.city&&v.locations.length)],
     ['Media & verification',!!(v?.image&&v.gallery.length)],
     ['About the business',!!(v?.summary&&v.description)],
+    ['Mobile number',Boolean(user.phoneVerified)],
   ] as const;
   const firstName=v?.owner.split(' ')[0];
 
@@ -43,6 +44,8 @@ export default async function Dashboard(){
       <aside className="workspace-guidance"><h2>Get discovered across India.</h2><p>A complete and verified profile helps customers understand your work before they contact you.</p><div><strong>Simple. Credible. City by city.</strong><span>That’s Occanova.</span></div></aside>
     </section>
 
+    <MobileVerification phone={user.phone} verified={Boolean(user.phoneVerified)} enabled={mobileOtpEnabled()}/>
+
     <div className="stat-grid workspace-stats">
       <div><span>Review status</span><strong className="capitalize">{v?.status??'Draft'}</strong></div>
       <div><span>New enquiries</span><strong>{enquiries.filter(x=>x.status==='new').length}</strong></div>
@@ -54,7 +57,7 @@ export default async function Dashboard(){
 
     <section id="profile" className="panel workspace-section">
       <div className="workspace-section-heading"><div><h2>Business profile</h2><p>Keep your services, locations, media, and public information up to date.</p></div>{v?.published&&v.status==='approved'&&<Link href={'/vendors/'+v.slug}>View public profile</Link>}</div>
-      <ProfileForm vendor={v} categories={s.categories} locations={s.locations} email={user.email} phone={user.phone} storageEnabled={hasStorage()}/>
+      <ProfileForm vendor={v} categories={s.categories} locations={s.locations} email={user.email} phone={user.phone} storageEnabled={hasStorage()} mobileVerified={Boolean(user.phoneVerified)} mobileVerificationRequired={mobileOtpEnabled()}/>
     </section>
 
     <section id="enquiries" className="panel workspace-section">

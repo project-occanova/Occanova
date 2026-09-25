@@ -30,6 +30,7 @@ function normalize(state:State):State{
   const seededLocations=new Set(seeded.locations.map(x=>x.slug));
   state.locations=[...seeded.locations.map(base=>({...base,...incomingLocations.find(x=>x.slug===base.slug),name:base.name,slug:base.slug})),...incomingLocations.filter(x=>!seededLocations.has(x.slug))];
   state.vendors=(state.vendors??[]).map(v=>{const category=legacyCategories[v.category]||v.category;const service=v.service||state.categories.find(x=>x.name===category)?.services?.[0]||category;return {...v,category,service,documents:v.documents??[]};});
+  state.users=(state.users??[]).map(user=>({...user,phoneVerified:user.role==='admin'?true:Boolean(user.phoneVerified)}));
   return state;
 }
 
