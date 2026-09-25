@@ -22,7 +22,7 @@ function normalize(state:State):State{
   const incoming=state.categories??[];
   state.categories=seeded.categories.map(base=>{
     const saved=incoming.find(x=>(legacyCategories[x.name]||x.name)===base.name);
-    return saved?{...base,...saved,name:base.name,slug:base.slug,services:base.services}:{...base};
+    return saved?{...base,...saved,name:base.name,slug:base.slug,services:[...new Set([...(base.services??[]),...(saved.services??[])])]}:{...base};
   });
   const known=new Set(state.categories.map(x=>x.name));
   state.categories.push(...incoming.filter(x=>!known.has(legacyCategories[x.name]||x.name)).map(x=>({...x,services:x.services?.length?x.services:[x.name],phase:x.phase??2})));

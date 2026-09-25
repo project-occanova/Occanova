@@ -14,7 +14,7 @@ export default async function Admin({searchParams}:{searchParams:Promise<Record<
   if(user.role!=='admin')redirect('/dashboard');
   const s=await readState();
   const p=await searchParams;
-  const filtered=s.vendors.filter(v=>(!p.q||v.name.toLowerCase().includes(p.q.toLowerCase()))&&(!p.status||v.status===p.status)&&(!p.category||v.category===p.category)&&(!p.city||v.city===p.city));
+  const filtered=s.vendors.filter(v=>(!p.q||`${v.name} ${v.service}`.toLowerCase().includes(p.q.toLowerCase()))&&(!p.status||v.status===p.status)&&(!p.category||v.category===p.category)&&(!p.service||v.service===p.service)&&(!p.city||v.city===p.city));
   const visible=publicVendors(s.vendors);
   const pending=s.vendors.filter(x=>x.status==='pending');
 
@@ -42,10 +42,11 @@ export default async function Admin({searchParams}:{searchParams:Promise<Record<
         <input name="q" defaultValue={p.q} placeholder="Search business name" aria-label="Search business name"/>
         <select name="status" defaultValue={p.status} aria-label="Approval status"><option value="">All statuses</option>{['draft','pending','approved','rejected','suspended','inactive'].map(x=><option key={x}>{x}</option>)}</select>
         <select name="category" defaultValue={p.category} aria-label="Category"><option value="">All categories</option>{s.categories.map(x=><option key={x.slug}>{x.name}</option>)}</select>
+        <select name="service" defaultValue={p.service} aria-label="Subcategory"><option value="">All subcategories</option>{s.categories.map(x=><optgroup key={x.slug} label={x.name}>{x.services?.map(service=><option key={service}>{service}</option>)}</optgroup>)}</select>
         <select name="city" defaultValue={p.city} aria-label="City"><option value="">All cities</option>{s.locations.map(x=><option key={x.slug}>{x.name}</option>)}</select>
         <button className="button small">Apply filters</button>
       </form>
-      <div className="table-wrap responsive-table"><table><thead><tr><th>Business</th><th>Service / location</th><th>Status</th><th>Visibility</th><th>Action</th></tr></thead><tbody>{filtered.map(v=><tr key={v.id}><td data-label="Business"><strong>{v.name}</strong>{v.sample&&<small>Sample listing</small>}</td><td data-label="Service / location">{v.category}<small>{v.city}</small></td><td data-label="Status"><span className={'status '+v.status}>{v.status}</span></td><td data-label="Visibility">{v.published&&v.status==='approved'?'Public':'Hidden'}{isFeatured(v)&&<small>Featured · priority {v.priority}</small>}</td><td data-label="Action"><Link className="button outline small" href={'/admin/vendors/'+v.id}>Review</Link></td></tr>)}</tbody></table>{!filtered.length&&<p className="empty-state">No vendors match these filters.</p>}</div>
+      <div className="table-wrap responsive-table"><table><thead><tr><th>Business</th><th>Service / location</th><th>Status</th><th>Visibility</th><th>Action</th></tr></thead><tbody>{filtered.map(v=><tr key={v.id}><td data-label="Business"><strong>{v.name}</strong>{v.sample&&<small>Sample listing</small>}</td><td data-label="Service / location">{v.category}<small>{v.service} · {v.city}</small></td><td data-label="Status"><span className={'status '+v.status}>{v.status}</span></td><td data-label="Visibility">{v.published&&v.status==='approved'?'Public':'Hidden'}{isFeatured(v)&&<small>Featured · priority {v.priority}</small>}</td><td data-label="Action"><Link className="button outline small" href={'/admin/vendors/'+v.id}>Review</Link></td></tr>)}</tbody></table>{!filtered.length&&<p className="empty-state">No vendors match these filters.</p>}</div>
     </section>
 
     <section id="enquiries" className="panel workspace-section">
@@ -54,7 +55,7 @@ export default async function Admin({searchParams}:{searchParams:Promise<Record<
     </section>
 
     <section id="taxonomy" className="two-panels workspace-section-grid">
-      <div className="panel workspace-section"><div className="workspace-section-heading"><div><h2>Service categories</h2><p>Control which vendor categories are available.</p></div></div><TaxonomyForm type="categories" items={s.categories}/></div>
+      <div className="panel workspace-section"><div className="workspace-section-heading"><div><h2>Categories & subcategories</h2><p>Review the services customers can filter by, and add new ones.</p></div></div><TaxonomyForm type="categories" items={s.categories}/></div>
       <div className="panel workspace-section"><div className="workspace-section-heading"><div><h2>Operating locations</h2><p>Manage the cities and service areas vendors can select.</p></div></div><TaxonomyForm type="locations" items={s.locations}/></div>
     </section>
 

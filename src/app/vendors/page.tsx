@@ -8,7 +8,7 @@ import type {Taxon} from '@/lib/types';
 export const metadata={title:'Find event vendors across India',description:'Explore event planners, venues, photographers, caterers, decorators and more across India.',alternates:{canonical:'/vendors'}};
 export const dynamic='force-dynamic';
 
-type FilterControlsProps={categories:Taxon[];locations:Taxon[];category?:string;city?:string;q?:string};
+type FilterControlsProps={categories:Taxon[];locations:Taxon[];category?:string;service?:string;city?:string;q?:string};
 function FilterControls(props:FilterControlsProps){
   return <><SearchForm compact {...props}/><p className="quiet-note">Featured vendors appear first, followed by vendors in alphabetical order.</p></>;
 }
@@ -19,7 +19,7 @@ export default async function Directory({searchParams}:{searchParams:Promise<Rec
   const rows=publicVendors(s.vendors,p);
   const pages=Math.max(1,Math.ceil(rows.length/6));
   const page=Math.min(pages,Math.max(1,Math.floor(Number(p.page))||1));
-  const activeFilters=[p.category,p.city,p.q].filter(Boolean).length;
+  const activeFilters=[p.category,p.service,p.city,p.q].filter(Boolean).length;
   const query=new URLSearchParams(Object.entries(p).filter((x):x is [string,string]=>!!x[1]));
   return <>
     <Header/>
@@ -29,11 +29,11 @@ export default async function Directory({searchParams}:{searchParams:Promise<Rec
       <div className="directory-layout">
         <aside className="filters desktop-filters">
           <div className="section-heading"><h3>Refine your search</h3><Link href="/vendors">Clear all</Link></div>
-          <FilterControls categories={s.categories} locations={s.locations} category={p.category} city={p.city} q={p.q}/>
+          <FilterControls categories={s.categories} locations={s.locations} category={p.category} service={p.service} city={p.city} q={p.q}/>
         </aside>
         <details className="filters mobile-filters">
           <summary><span><SlidersHorizontal size={18} aria-hidden="true"/>Filter vendors</span><small>{activeFilters?`${activeFilters} active`:'All vendors'}</small><ChevronDown size={18} aria-hidden="true"/></summary>
-          <div className="mobile-filter-body"><div className="mobile-filter-heading"><strong>Refine your search</strong><Link href="/vendors">Clear all</Link></div><FilterControls categories={s.categories} locations={s.locations} category={p.category} city={p.city} q={p.q}/></div>
+          <div className="mobile-filter-body"><div className="mobile-filter-heading"><strong>Refine your search</strong><Link href="/vendors">Clear all</Link></div><FilterControls categories={s.categories} locations={s.locations} category={p.category} service={p.service} city={p.city} q={p.q}/></div>
         </details>
         <section>
           <div className="results-head"><span>{rows.length} {rows.length===1?'vendor':'vendors'} found</span><span>Featured first</span></div>
