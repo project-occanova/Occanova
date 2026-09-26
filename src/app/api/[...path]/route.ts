@@ -10,7 +10,7 @@ import {backendReady,hasDatabase,hasEmail,hasMobileOtp,hasStorage,localPreview,m
 import {rateLimited} from '@/lib/rate-limit';
 import {sendEnquiryNotifications,sendResetEmail,sendVerificationEmail} from '@/lib/email';
 import {cleanupOrphanedUploads,createDownload,deleteUploads,validVendorKey,vendorStorageKeys} from '@/lib/storage';
-import {checkMobileOtp,normalizeIndianMobile,sendMobileOtp} from '@/lib/mobile-otp';
+import {mobileOtpHash,normalizeIndianMobile,sendMobileOtp} from '@/lib/mobile-otp';
 export const runtime='nodejs';
 const fail=(message:string,status=400)=>NextResponse.json({error:message},{status});
 export async function GET(req:NextRequest,{params}:{params:Promise<{path:string[]}>}) {
@@ -77,13 +77,16 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
    if(user.phoneVerified)return NextResponse.json({ok:true,verified:true,message:'Your mobile number is already verified.'});
    if(await rateLimited(`mobile-send:${user.id}`,3,10*60*1000))return fail('Too many verification requests. Please wait 10 minutes and try again.',429);
    const phone=normalizeIndianMobile(user.phone);if(!phone)return fail('Your account does not have a valid Indian mobile number.',400);
-   if(hasMobileOtp())await sendMobileOtp(phone);
-   else if(localPreview()){
-    const code=String(randomInt(100000,1000000));
-    await mutate(s=>{s.tokens=s.tokens.filter(x=>!(x.userId===user.id&&x.kind==='mobile'));s.tokens.push({hash:digest(`${user.id}:${code}`),userId:user.id,kind:'mobile',expires:Date.now()+10*60*1000});});
-    return NextResponse.json({ok:true,message:'A verification code was created for this local preview.',previewCode:code});
-   }else return fail('Mobile verification is not configured yet.',503);
-   return NextResponse.json({ok:true,message:'A six-digit verification code was sent by SMS.'});
+   if(!mobileOtpEnabled())return fail('Mobile verification is not configured yet.',503);
+   if(await rateLimited(`mobile-phone:${phone}`,5,60*60*1000))return fail('Too many verification requests for this number. Please try again in an hour.',429);
+   const code=String(randomInt(100000,1000000));
+   const hash=mobileOtpHash(user.id,phone,code);
+   await mutate(s=>{s.tokens=s.tokens.filter(x=>!(x.userId===user.id&&x.kind==='mobile'));s.tokens.push({hash,userId:user.id,kind:'mobile',expires:Date.now()+10*60*1000});});
+   if(hasMobileOtp()){
+    try{await sendMobileOtp(phone,code);}catch(error){await mutate(s=>{s.tokens=s.tokens.filter(x=>!(x.userId===user.id&&x.kind==='mobile'&&x.hash===hash));});throw error;}
+    return NextResponse.json({ok:true,message:'A six-digit verification code was sent by SMS.'});
+   }
+   return NextResponse.json({ok:true,message:'A verification code was created for this local preview.',previewCode:code});
   }
   if(route==='auth/mobile/verify'){
    if(user.role!=='vendor')return fail('Vendor access required',403);
@@ -91,13 +94,17 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
    if(await rateLimited(`mobile-check:${user.id}`,5,10*60*1000))return fail('Too many incorrect attempts. Please wait 10 minutes and request a new code.',429);
    const code=z.string().regex(/^\d{6}$/,'Enter the six-digit verification code.').parse(b.code);
    const phone=normalizeIndianMobile(user.phone);if(!phone)return fail('Your account does not have a valid Indian mobile number.',400);
-   let approved=false;
-   if(hasMobileOtp())approved=await checkMobileOtp(phone,code);
-   else if(localPreview()){
-    const state=await readState();approved=state.tokens.some(x=>x.userId===user.id&&x.kind==='mobile'&&x.hash===digest(`${user.id}:${code}`)&&x.expires>Date.now());
-   }else return fail('Mobile verification is not configured yet.',503);
+   if(!mobileOtpEnabled())return fail('Mobile verification is not configured yet.',503);
+   const approved=await mutate(s=>{
+    const hash=mobileOtpHash(user.id,phone,code);
+    if(!s.tokens.some(x=>x.userId===user.id&&x.kind==='mobile'&&x.hash===hash&&x.expires>Date.now()))return false;
+    const account=s.users.find(x=>x.id===user.id);if(!account)throw Error('Access denied');
+    account.phoneVerified=true;account.phoneVerifiedAt=new Date().toISOString();
+    s.tokens=s.tokens.filter(x=>!(x.userId===user.id&&x.kind==='mobile'));
+    s.audit.unshift({id:randomUUID(),actor:user.email,action:'Mobile number verified',target:'Vendor account',remarks:'Verified by one-time SMS code',at:new Date().toISOString()});
+    return true;
+   });
    if(!approved)return fail('The verification code is incorrect or expired.',400);
-   await mutate(s=>{const account=s.users.find(x=>x.id===user.id);if(!account)throw Error('Access denied');account.phoneVerified=true;account.phoneVerifiedAt=new Date().toISOString();s.tokens=s.tokens.filter(x=>!(x.userId===user.id&&x.kind==='mobile'));s.audit.unshift({id:randomUUID(),actor:user.email,action:'Mobile number verified',target:'Vendor account',remarks:'Verified by one-time SMS code',at:new Date().toISOString()});});
    return NextResponse.json({ok:true,verified:true,message:'Mobile number verified successfully.'});
   }
   if(route==='profile') {if(user.role!=='vendor')return fail('Vendor access required',403);if(b.submit===true&&mobileOtpEnabled()&&!user.phoneVerified)return fail('Verify your mobile number before submitting your profile for review.',403);const v=profileSchema.parse(b);const coverage=[...new Set([v.city,...(v.locations??[])])];const owned=(value:string,kind?:string)=>{if(!value)return true;if(!value.startsWith('/api/media?'))return false;const key=new URL(value,'http://local').searchParams.get('key')||'';return validVendorKey(key)&&key.startsWith(`vendors/${user.id}/`)&&(!kind||key.includes(`/${kind}/`));};if(!owned(v.image,'logo')||v.gallery.some(x=>!owned(x,'portfolio'))||v.documents.some(x=>!owned(x,'document')))return fail('Invalid uploaded file reference',403);const result=await mutate(s=>{const category=s.categories.find(x=>x.active&&x.name===v.category);if(!category||!category.services?.includes(v.service)||!coverage.every(location=>s.locations.some(x=>x.active&&x.name===location)))throw Error('Choose an active category, specialisation, and location.');let vendor=s.vendors.find(x=>x.userId===user.id);if(vendor?.status==='suspended'||vendor?.status==='inactive')throw Error('Contact Occanova to reactivate your account.');const previous=vendor?new Set(vendorStorageKeys(vendor)):new Set<string>();if(!vendor){vendor={id:randomUUID(),userId:user.id,slug:slugify(v.name)+'-'+randomUUID().slice(0,6),status:'draft',published:false,featured:false,priority:100,featuredStart:'',featuredEnd:'',remarks:'',sample:false,...v,locations:coverage};s.vendors.push(vendor);}else{Object.assign(vendor,v,{locations:coverage,status:'draft',published:false});}if(b.submit===true)vendor.status='pending';const retained=new Set(vendorStorageKeys(vendor));return {vendor,obsolete:[...previous].filter(key=>!retained.has(key))};});if(hasStorage()&&result.obsolete.length)try{await deleteUploads(result.obsolete);}catch(error){console.error('Upload cleanup failed; scheduled maintenance will retry.',error);}return NextResponse.json({ok:true,vendor:result.vendor});}

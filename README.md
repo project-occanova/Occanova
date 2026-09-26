@@ -24,6 +24,14 @@ On Vercel, the app remains read-only until a MongoDB connection variable (`MONGO
 
 The database uses separate collections for vendors, users, enquiries, sessions, one-time tokens, categories, locations and audit events. Mutations run in MongoDB transactions; session/token expiry uses TTL indexes. Resend sends verification, password-reset and enquiry emails. S3-compatible storage validates file type and size, keeps verification documents private, and serves downloads through five-minute URLs; public portfolio media is available only for approved listings. Replaced files are deleted after a successful profile save; a protected daily job removes uploads that remain unreferenced for more than 24 hours.
 
+## Vendor mobile OTP with 2Factor
+
+1. In 2Factor, prepare an approved SMS OTP template with one variable for a six-digit code. Use the exact template name supplied in the 2Factor account. The [2Factor OTP send API](https://2factor.in/v4/services/bulk-sms-api.html) uses `template_name` and `var1` for this flow.
+2. Set `TWOFACTOR_API_KEY` and `TWOFACTOR_TEMPLATE_NAME` in Vercel Production environment variables, then redeploy. Keep the API key only in Vercel or a private local `.env.local` file; do not commit it.
+3. Check `/api/health` for `mobileOtp: true`. Sign in as a test vendor, send one code to an Indian mobile number, and verify it before submitting a profile. A configured flag confirms credentials are present; a real send-and-verify test confirms delivery.
+
+Codes expire after ten minutes, are limited to three sends and five verification attempts per ten minutes per vendor, plus five sends per phone number per hour, and are stored as keyed hashes. Until both 2Factor variables are set, production mobile verification stays disabled. Local preview can display a test code without sending an SMS.
+
 ## Working flows
 
 - Homepage, category/city discovery, search, pagination, empty states and public profiles.

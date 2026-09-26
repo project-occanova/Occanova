@@ -1,3 +1,4 @@
+import {createHmac} from 'node:crypto';
 import {hasMobileOtp} from './config';
 
 export function normalizeIndianMobile(value:string){
@@ -6,30 +7,24 @@ export function normalizeIndianMobile(value:string){
   return /^[6-9]\d{9}$/.test(national)?`+91${national}`:'';
 }
 
-function credentials(){
-  const account=process.env.TWILIO_ACCOUNT_SID??'';
-  const secret=process.env.TWILIO_AUTH_TOKEN??'';
-  const service=process.env.TWILIO_VERIFY_SERVICE_SID??'';
+export function mobileOtpHash(userId:string,phone:string,code:string){
+  // The provider key peppers short OTPs in production; local preview has no real recipients.
+  const secret=process.env.TWOFACTOR_API_KEY||'occanova-local-preview-only';
+  return createHmac('sha256',secret).update(`${userId}:${phone}:${code}`).digest('hex');
+}
+
+export async function sendMobileOtp(phone:string,code:string){
   if(!hasMobileOtp())throw Error('Mobile verification is not configured yet.');
-  return {service,authorization:`Basic ${Buffer.from(`${account}:${secret}`).toString('base64')}`};
-}
-
-async function twilio(path:string,body:URLSearchParams){
-  const {service,authorization}=credentials();
-  const response=await fetch(`https://verify.twilio.com/v2/Services/${encodeURIComponent(service)}/${path}`,{
-    method:'POST',headers:{Authorization:authorization,'Content-Type':'application/x-www-form-urlencoded'},body,signal:AbortSignal.timeout(12_000),
-  });
-  const result=await response.json().catch(()=>({})) as {status?:string};
-  return {response,result};
-}
-
-export async function sendMobileOtp(phone:string){
-  const {response,result}=await twilio('Verifications',new URLSearchParams({To:phone,Channel:'sms'}));
-  if(!response.ok||result.status!=='pending')throw Error('The verification message could not be sent. Please try again.');
-}
-
-export async function checkMobileOtp(phone:string,code:string){
-  const {response,result}=await twilio('VerificationCheck',new URLSearchParams({To:phone,Code:code}));
-  if(!response.ok&&response.status!==400&&response.status!==404)throw Error('The mobile verification service is temporarily unavailable.');
-  return result.status==='approved';
+  let response:Response;
+  try{
+    response=await fetch('https://2factor.in/API/V1/OTP/SEND',{
+      method:'POST',
+      headers:{'X-API-Key':process.env.TWOFACTOR_API_KEY!,'Content-Type':'application/json'},
+      body:JSON.stringify({to:phone,template_name:process.env.TWOFACTOR_TEMPLATE_NAME,var1:code}),
+      signal:AbortSignal.timeout(12_000),
+    });
+  }catch{throw Error('The verification message could not be sent. Please try again.');}
+  const result=await response.json().catch(()=>({})) as {status?:string;Status?:string};
+  const status=(result.status??result.Status??'').toLowerCase();
+  if(!response.ok||!['sent','success'].includes(status))throw Error('The verification message could not be sent. Please try again.');
 }
