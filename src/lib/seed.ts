@@ -1,5 +1,6 @@
 import type { State, Vendor } from './types';
 import { slugify } from './directory';
+import {categoryDefinitions} from './taxonomy';
 export const photos = {
   hero:'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1800&q=85',
   decor:'https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=900&q=85',
@@ -17,25 +18,9 @@ const specs = [
   ['Little Light Studio','Photography & Media','Kozhikode',30000,photos.photo,'A relaxed approach to documenting your once-in-a-lifetime moments.'],
   ['Gather & Graze','Catering & Food','Kochi',850,photos.food,'Beautifully presented feasts for intimate parties and grand occasions.'],
 ] as const;
-const categories = [
-  ['Event Planning & Management',['Wedding planners','Event planners','Corporate event managers','Birthday party planners','Conference organisers','Church and worship-event organisers','Event coordinators'],1],
-  ['Venues & Accommodation',['Hotels and resorts','Banquet and wedding halls','Conference halls','Community halls','Guesthouses and homestays','Outdoor venues','Farmhouses and campsites'],1],
-  ['Sound, Lighting & Stage',['Sound-system providers','Lighting providers','LED-wall providers','Stage and truss providers','Generator providers','Special-effects providers','DJ equipment providers','Sound and lighting dealers'],1],
-  ['Decoration & Florists',['Wedding and event decorators','Florists','Balloon decorators','Theme decorators','Entrance and backdrop designers','Mandap decorators','Church decorators'],1],
-  ['Catering & Food',['Caterers','Restaurants','Bakers and cake designers','Snack and dessert vendors','Beverage providers','Live food-stall providers','Bartending services'],1],
-  ['Photography & Media',['Photographers','Videographers','Wedding filmmakers','Drone operators','Photo-booth providers','Live-streaming teams','Video editors','Social-media coverage teams'],1],
-  ['Makeup, Fashion & Styling',['Makeup artists','Hairstylists','Bridal-wear designers','Groom-wear designers','Fashion designers and boutiques','Jewellery providers','Clothing and accessory rentals','Personal stylists'],1],
-  ['Artists & Entertainment',['Singers and bands','DJs and musicians','Dancers','Anchors and emcees','Comedians','Magicians','Cultural performers','Artist-management agencies'],1],
-  ['Tent, Furniture & Equipment Rentals',['Tent houses','Table and chair rentals','Sofa and lounge rentals','Canopy providers','Cooling and heating equipment rentals','Carpet and furnishing rentals','Kitchen-equipment rentals','Portable washroom providers'],1],
-  ['Invitations, Printing & Gifts',['Invitation-card designers','Printing businesses','Digital invitation designers','Signage and banner printers','Gift and hamper providers','Wedding-favour vendors','Trophy and certificate providers','Personalised merchandise businesses'],2],
-  ['Transportation & Logistics',['Wedding-car rentals','Bus and traveller rentals','Taxi services','Luxury-car providers','Logistics providers','Equipment-transport providers','Valet-parking services'],2],
-  ['Event Support Services',['Security agencies','Bouncers','Ushers and event staff','Cleaning services','Electricians','Event insurance providers','First-aid and ambulance services','Technical-support teams'],2],
-  ['Bands',['Gospel/Worship','Rock','Pop','Indie','Jazz','Blues','Folk/Traditional','Classical','Cover/Party','Other'],2],
-  ['Solo Artists',['Singers','Solo performers'],2],
-  ['Solo Musicians',['Drummer','Guitarist','Keyboardist','Bassist','Other instruments'],2],
-] as const;
+const categories=categoryDefinitions;
 const defaultService:Record<string,string>={
-  'Decoration & Florists':'Wedding and event decorators','Photography & Media':'Photographers','Catering & Food':'Caterers','Venues & Accommodation':'Banquet and wedding halls','Event Planning & Management':'Wedding planners'
+  'Decoration & Florists':'Wedding decorators','Photography & Media':'Photographers','Catering & Food':'Full-service caterers','Venues & Accommodation':'Banquet halls','Event Planning & Management':'Wedding planners'
 };
 export const indianLocations=[
   'Pan India','Agra','Ahmedabad','Aizawl','Amritsar','Bengaluru','Bhopal','Bhubaneswar','Chandigarh','Chennai','Coimbatore','Dehradun','Delhi NCR','Faridabad','Gangtok','Ghaziabad','Goa','Gurugram','Guwahati','Gwalior','Hyderabad','Imphal','Indore','Itanagar','Jabalpur','Jaipur','Jalandhar','Jammu','Jamshedpur','Jodhpur','Kanpur','Kochi','Kohima','Kolkata','Kota','Kottayam','Kozhikode','Leh','Lucknow','Ludhiana','Madurai','Mangaluru','Meerut','Mumbai','Mysuru','Nagpur','Nashik','Noida','Patna','Port Blair','Prayagraj','Puducherry','Pune','Raipur','Rajkot','Ranchi','Salem','Shillong','Shimla','Siliguri','Srinagar','Surat','Thane','Thiruvananthapuram','Thrissur','Tiruchirappalli','Tirupati','Udaipur','Vadodara','Varanasi','Vijayawada','Visakhapatnam','Warangal'

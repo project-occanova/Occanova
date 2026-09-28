@@ -3,13 +3,14 @@
 import {useState} from 'react';
 import {ArrowUpRight} from 'lucide-react';
 import type {Taxon} from '@/lib/types';
-import {slugify} from '@/lib/directory';
+import {slugify} from '@/lib/slugs';
+import {categoryName,serviceName} from '@/lib/taxonomy';
 
 export function SearchForm({categories,locations,category='',service='',city='',q='',compact=false}:{categories:Taxon[];locations:Taxon[];category?:string;service?:string;city?:string;q?:string;compact?:boolean}){
   const activeCategories=categories.filter(x=>x.active);
-  const initialCategory=category||activeCategories.find(x=>x.services?.some(item=>slugify(item)===slugify(service)))?.slug||'';
+  const initialCategory=(category?slugify(categoryName(category)):'')||activeCategories.find(x=>x.services?.some(item=>slugify(item)===slugify(service)))?.slug||'';
   const [selectedCategory,setSelectedCategory]=useState(initialCategory);
-  const [selectedService,setSelectedService]=useState(slugify(service));
+  const [selectedService,setSelectedService]=useState(slugify(serviceName(category,service)));
   const services=activeCategories.find(x=>x.slug===selectedCategory)?.services??[];
 
   return <form action="/vendors" className={compact?'filter-form':'search-form'}>
