@@ -8,7 +8,7 @@ test('Indian vendor mobile numbers are stored in E.164 format',()=>{
   assert.equal(normalizeIndianMobile('98765 43210'),'+919876543210');
   assert.equal(normalizeIndianMobile('+91 98765-43210'),'+919876543210');
   assert.equal(normalizeIndianMobile('12345 67890'),'');
-  const registration=registerSchema.parse({email:'vendor@example.com',phone:'9876543210',password:'secure-passphrase',consent:true});
+  const registration=registerSchema.parse({email:'vendor@example.com',phone:'9876543210',password:'secure-passphrase',plan:'starter',consent:true});
   assert.equal(registration.phone,'+919876543210');
 });
 

@@ -13,8 +13,8 @@ type MongoDoc={_id:string;[key:string]:unknown};
 type MetaDoc={_id:string;revision:number;initializedAt?:Date;seedVersion?:number};
 // Increment when the default categories or locations need to be merged again.
 const seedVersion=4;
-const collections:StateList[]=['vendors','users','enquiries','sessions','tokens','categories','locations','audit'];
-const keys:Record<StateList,string>={vendors:'id',users:'id',enquiries:'id',sessions:'hash',tokens:'hash',categories:'slug',locations:'slug',audit:'id'};
+const collections:StateList[]=['vendors','users','registrations','enquiries','sessions','tokens','categories','locations','audit'];
+const keys:Record<StateList,string>={vendors:'id',users:'id',registrations:'id',enquiries:'id',sessions:'hash',tokens:'hash',categories:'slug',locations:'slug',audit:'id'};
 
 function normalize(state:State):State{
   const seeded=initialState();
@@ -59,6 +59,7 @@ async function mongoRead(session?:ClientSession):Promise<State>{
 function document(name:StateList,row:Record<string,unknown>,order:number){
   const value={...row,_id:String(row[keys[name]]),_order:order} as MongoDoc;
   if((name==='sessions'||name==='tokens')&&typeof row.expires==='number')value.expiresAt=new Date(row.expires);
+  if(name==='registrations'&&typeof row.expires==='number'&&(row.completedUserId||!(row.subscription as {gatewayId?:string}|undefined)?.gatewayId))value.expiresAt=new Date(row.expires);
   return value;
 }
 

@@ -6,7 +6,7 @@ const globals=globalThis as typeof globalThis&{
   occanovaIndexes?:Promise<void>;
 };
 // Increment when createIndexes changes so existing databases receive new indexes.
-const indexVersion=1;
+const indexVersion=2;
 
 export function mongoConfigured(){return Boolean(databaseUrl());}
 
@@ -23,6 +23,7 @@ async function createIndexes(db:Db){
     db.collection('enquiries').createIndex({vendorId:1,createdAt:-1}),
     (async()=>{const sessions=db.collection('sessions');await sessions.createIndex({hash:1},{unique:true});await sessions.createIndex({expiresAt:1},{expireAfterSeconds:0});})(),
     (async()=>{const tokens=db.collection('tokens');await tokens.createIndex({hash:1},{unique:true});await tokens.createIndex({expiresAt:1},{expireAfterSeconds:0});})(),
+    (async()=>{const pending=db.collection('registrations');await pending.createIndex({email:1});await pending.createIndex({'subscription.gatewayId':1});await pending.createIndex({expiresAt:1},{expireAfterSeconds:0});})(),
     db.collection('categories').createIndex({slug:1},{unique:true}),
     db.collection('locations').createIndex({slug:1},{unique:true}),
     db.collection('audit').createIndex({at:-1}),

@@ -3,6 +3,7 @@ import {
   ArrowUpRight,
   ClipboardList,
   LayoutDashboard,
+  CreditCard,
   Layers,
   Mail,
   Menu,
@@ -29,7 +30,7 @@ export function Workspace({admin=false,children,email}:{admin?:boolean;children:
     {href:`${base}#taxonomy`,label:'Categories & locations',icon:Layers},
     {href:`${base}#activity`,label:'Activity log',icon:ClipboardList},
     {href:`${base}#account`,label:'Account',icon:Settings2},
-  ]:[{href:`${base}#account`,label:'Account',icon:Settings2}];
+  ]:[{href:`${base}#subscription`,label:'Plan & billing',icon:CreditCard},{href:`${base}#account`,label:'Account',icon:Settings2}];
   const mobile=[...primary,{href:`${base}#account`,label:'Account',icon:Settings2}];
 
   return <div className={`workspace${admin?' admin-workspace':''}`}>

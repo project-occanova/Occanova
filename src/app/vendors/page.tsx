@@ -16,7 +16,7 @@ function FilterControls(props:FilterControlsProps){
 export default async function Directory({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){
   const p=await searchParams;
   const s=await readState();
-  const rows=publicVendors(s.vendors,p);
+  const rows=publicVendors(s.vendors,p,s.users);
   const pages=Math.max(1,Math.ceil(rows.length/6));
   const page=Math.min(pages,Math.max(1,Math.floor(Number(p.page))||1));
   const activeFilters=[p.category,p.service,p.city,p.q].filter(Boolean).length;

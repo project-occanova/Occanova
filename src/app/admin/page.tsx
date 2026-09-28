@@ -15,7 +15,7 @@ export default async function Admin({searchParams}:{searchParams:Promise<Record<
   const s=await readState();
   const p=await searchParams;
   const filtered=s.vendors.filter(v=>(!p.q||`${v.name} ${v.service}`.toLowerCase().includes(p.q.toLowerCase()))&&(!p.status||v.status===p.status)&&(!p.category||v.category===p.category)&&(!p.service||v.service===p.service)&&(!p.city||v.city===p.city));
-  const visible=publicVendors(s.vendors);
+  const visible=publicVendors(s.vendors,{},s.users);
   const pending=s.vendors.filter(x=>x.status==='pending');
 
   return <Workspace admin email={user.email}>

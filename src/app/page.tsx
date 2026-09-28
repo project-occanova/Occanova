@@ -11,7 +11,7 @@ export const revalidate=60;
 
 export default async function Home(){
   const s=await readState();
-  const featured=publicVendors(s.vendors).filter(v=>isFeatured(v)).slice(0,3);
+  const featured=publicVendors(s.vendors,{},s.users).filter(v=>isFeatured(v)).slice(0,3);
   return <>
     <Header/>
     <main id="main">

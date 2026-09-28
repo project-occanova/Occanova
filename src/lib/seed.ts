@@ -31,5 +31,5 @@ export function initialState():State { return {
   // available to vendors and customers.
   categories:categories.map(([name,services,phase],position)=>({name,slug:slugify(name),active:true,services:[...services],phase,position:position+1})),
   locations:indianLocations.map((name,position)=>({name,slug:slugify(name),active:true,position:position+1})),
-  users:[],enquiries:[],sessions:[],tokens:[],audit:[],
+  users:[],registrations:[],enquiries:[],sessions:[],tokens:[],audit:[],
 }; }
