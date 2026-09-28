@@ -8,6 +8,7 @@ export const metadata:Metadata={
   title:{default:'Occanova — Your event, your way.',template:'%s | Occanova'},
   description,
   applicationName:'Occanova',
+  icons:{icon:{url:'/occanova-logo.jpg',type:'image/jpeg'},apple:'/occanova-logo.jpg'},
   alternates:{canonical:'/'},
   openGraph:{title:'Occanova — Your event, your way.',description,url:'/',siteName:'Occanova',locale:'en_IN',type:'website',images:[{url:'/occanova-logo.jpg',alt:'Occanova — Your event, your way.'}]},
   twitter:{card:'summary_large_image',title:'Occanova — Your event, your way.',description,images:['/occanova-logo.jpg']},
