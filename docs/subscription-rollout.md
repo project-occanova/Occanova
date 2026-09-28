@@ -1,6 +1,6 @@
 # Vendor subscription rollout
 
-The subscription code ships behind `SUBSCRIPTIONS_ENABLED=true`. Keep that flag off in production until the Test Mode authorization and public webhook checks pass. Local development uses Test Mode; never copy local Test Mode credentials into production. With the flag off, existing production registration and listings keep their current behavior.
+The subscription code ships behind `SUBSCRIPTIONS_ENABLED=true`. Keep that flag off until the chosen gateway mode has validated credentials, plans and a public webhook. The owner has selected Live Mode for production; local Test Mode credentials must never be copied there. With the flag off, existing production registration and listings keep their current behavior. Full mandate authorization and provider webhook delivery remain unverified.
 
 ## Plans from the supplied PDF
 
@@ -42,7 +42,7 @@ Restart the local server after changing environment variables. For the local Che
 
 ## Connection checked on 28 September 2026
 
-Razorpay Test Mode credentials are saved only in ignored `.env.local`. All four monthly plan IDs were created and fetched back with the expected INR amounts. A temporary Starter subscription was created with its first paid cycle exactly two calendar months in the future, fetched back with zero paid cycles, then cancelled and fetched back to confirm cancellation. The local preview enables mandatory subscription registration with Test Mode keys. The production rollout flag has not changed. No subscription deployment or GitHub push was performed.
+Razorpay Test Mode credentials are saved only in ignored `.env.local`. All four monthly plan IDs were created and fetched back with the expected INR amounts. A temporary Starter subscription was created with its first paid cycle exactly two calendar months in the future, fetched back with zero paid cycles, then cancelled and fetched back to confirm cancellation. The local preview enables mandatory subscription registration with Test Mode keys. The production rollout flag has not changed. That initial connection check did not push or deploy. The gated subscription implementation was subsequently deployed in commit 9bf36a0 with production billing disabled.
 
 `npm run billing:smoke` repeats this gateway check with test credentials only and customer notifications disabled. It creates and cancels one temporary test subscription. This does not verify an actual card/UPI mandate, a successful charge, failed-debit handling, or webhook delivery. These still require a local Checkout session and a public Test Mode webhook endpoint before rollout.
 
@@ -57,3 +57,18 @@ Checkout retries reuse an unexpired created subscription. Changing plans cancels
 Validation: 49 automated tests pass, including pending signup, consent, email-only denial, mandate ownership/schedule validation, duplicate activation, server plan-price validation, retry, plan change and trial reuse. Browser testing at 390, 820 and 1440 pixels verifies registration and setup rendering without horizontal overflow. A pending signup is rejected from the dashboard and profile API. Invalid callback signatures and correctly signed callbacks for still-created mandates do not activate accounts. Local signed-webhook checks also reject invalid signatures and use authoritative gateway state on event replay, so a still-created mandate cannot be activated by an event payload claiming it is active. Public delivery from Razorpay remains a separate staging check before production billing is enabled.
 
 The final Test Mode Checkout attempt successfully loaded the official card-entry screen without application errors or CSP errors. Razorpay then requested an OTP during card setup; authorization was not completed. The disposable registration remained absent from Users throughout. Its unfinished Test Mode mandate was cancelled and fetched back as cancelled, and only its own local fixture records were removed. Complete the next test with the owner’s own contact details in Checkout; never send an OTP or payment secret through chat.
+
+## Live Mode configuration
+
+The owner requested Live Mode. Keep Live credentials separate in ignored `.env.razorpay-live.local`:
+
+```dotenv
+RAZORPAY_KEY_ID=rzp_live_your_key_id
+RAZORPAY_KEY_SECRET=your_live_key_secret
+```
+
+Run `npm run billing:live:check` to validate Live keys and plans, or `npm run billing:live:setup` to create/reuse the four Live monthly plans and generate a separate Live webhook secret. These commands do not create subscriptions or charge customers. The default Test command continues to refuse Live credentials. Test and Live plan IDs are not interchangeable.
+
+Transfer only the Live key pair, four Live plan IDs and matching webhook secret to Vercel Production. Configure the Live webhook in Razorpay Dashboard for `https://www.occanova.com/api/billing/webhook`, using the subscription events listed above. The current handler returns 503 while the rollout flag is off; deploy with complete configuration and the flag enabled when the Live webhook is ready, then verify delivery. The endpoint must be reachable without Vercel deployment protection. Complete authorization with the owner's own contact and payment details in Checkout; bank OTPs stay in Checkout. Use a separate `CRON_SECRET` for the daily first-charge reminder job. Never report the provider integration as verified until an authorized mandate and actual webhook delivery have passed.
+
+The Live helper's mode-isolation safeguards pass within the 50-test suite. Production remains without Razorpay credentials or an enabled subscription flag until Live setup is completed.
