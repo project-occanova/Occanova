@@ -3,6 +3,8 @@ import {currentUser} from '@/lib/auth';
 import {readOnlyDeployment} from '@/lib/config';
 import {rateLimited} from '@/lib/rate-limit';
 import {storeUpload,type UploadKind} from '@/lib/storage';
+import {readState} from '@/lib/store';
+import {assertPlanAccess,portfolioLimit,PlanAccessError} from '@/lib/plan-access';
 
 export const runtime='nodejs';
 const SERVER_UPLOAD_MAX=4_000_000;
@@ -20,6 +22,7 @@ export async function POST(req:NextRequest){
     const user=await currentUser();
     if(!user)return fail('Please sign in.',401);
     if(user.role!=='vendor')return fail('Vendor access required',403);
+    assertPlanAccess(user.subscription);
     const ip=req.headers.get('x-forwarded-for')?.split(',')[0]??'local';
     if(await rateLimited(`${ip}:upload:${user.id}`,12))return fail('Too many uploads. Please try again in a minute.',429);
 
@@ -27,11 +30,17 @@ export async function POST(req:NextRequest){
     const kind=data.get('kind');
     const file=data.get('file');
     if(typeof kind!=='string'||!uploadKinds.has(kind as UploadKind))return fail('Choose a valid upload type.');
+    if(kind==='portfolio'){
+      const saved=(await readState()).vendors.find(vendor=>vendor.userId===user.id)?.gallery.length??0;
+      const limit=portfolioLimit(user.subscription);
+      if(saved>=limit)return fail(`Your plan allows up to ${limit} portfolio photos. Save any photo removals before uploading more.`,400);
+    }
     if(!(file instanceof File)||file.size<1)return fail('Choose a file to upload.');
     if(file.size>SERVER_UPLOAD_MAX)return fail('This protected upload path supports files up to 4 MB.',413);
     const result=await storeUpload(user.id,kind as UploadKind,file.type,file.size,new Uint8Array(await file.arrayBuffer()));
     return NextResponse.json({ok:true,...result});
   }catch(error){
+    if(error instanceof PlanAccessError)return fail(error.message,error.status);
     const safe=['Private file storage','Choose an allowed'];
     if(error instanceof Error&&safe.some(message=>error.message.startsWith(message)))return fail(error.message);
     console.error('Protected upload failed',error);

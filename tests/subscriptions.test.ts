@@ -44,6 +44,7 @@ test('billing-enabled discovery hides vendors whose mandate is not authorized',(
   state.users.push({id:'vendor-user',email:'vendor@example.com',phone:'+919876543210',passwordHash:'x',role:'vendor',verified:true,subscription:{plan:'starter',status:'selected',updatedAt:'2026-09-27T00:00:00.000Z'}});
   assert.equal(publicVendors([vendor],{},state.users).length,0);
   state.users[0].subscription!.status='authenticated';
+  state.users[0].subscription!.trialEndsAt=new Date(Date.now()+86400000).toISOString();
   assert.equal(publicVendors([vendor],{},state.users).length,1);
   state.users[0].subscription!.status='cancelled';
   assert.equal(publicVendors([vendor],{},state.users).length,0);

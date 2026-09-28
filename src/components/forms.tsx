@@ -21,7 +21,7 @@ export function MobileVerification({phone,verified,enabled}:{phone:string;verifi
  return <section className="panel workspace-section mobile-verification"><div className="verification-icon"><Smartphone size={25}/></div><div className="verification-copy"><h2>Verify your mobile number</h2><p>We’ll send a six-digit OTP to {masked}. Verification is required before profile submission.</p>{!enabled&&<p className="error">SMS verification is being configured. You can continue saving your profile as a draft.</p>}{message&&<p className="success" role="status">{message}</p>}{previewCode&&<p className="notice">Local preview OTP: <strong>{previewCode}</strong></p>}{error&&<p className="error" role="alert">{error}</p>}{sent&&<form className="otp-form" onSubmit={async e=>{e.preventDefault();setBusy(true);setError('');try{const data=formData(e.currentTarget);const result=await post('auth/mobile/verify',{code:data.code});setMessage(result.message);router.refresh();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}><label className="field"><span>Six-digit OTP</span><input name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required placeholder="000000"/></label><button className="button" disabled={busy}>{busy?'Verifying…':'Verify number'}</button></form>}</div><button type="button" className="button outline small" disabled={busy||!enabled} onClick={async()=>{setBusy(true);setError('');setMessage('');try{const result=await post('auth/mobile/send',{});setSent(true);setMessage(result.message);setPreviewCode(result.previewCode||'');}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}>{busy?'Please wait…':sent?'Resend OTP':'Send OTP'}</button></section>;
 }
 
-export function ProfileForm({vendor:v,categories,locations,email,phone,storageEnabled,mobileVerified,mobileVerificationRequired,portfolioLimit=10}:{vendor?:Vendor;categories:Taxon[];locations:Taxon[];email:string;phone:string;storageEnabled:boolean;mobileVerified:boolean;mobileVerificationRequired:boolean;portfolioLimit?:number}){
+export function ProfileForm({vendor:v,categories,locations,email,phone,storageEnabled,mobileVerified,mobileVerificationRequired,portfolioLimit=10,editingEnabled=true,lockedReason=''}:{vendor?:Vendor;categories:Taxon[];locations:Taxon[];email:string;phone:string;storageEnabled:boolean;mobileVerified:boolean;mobileVerificationRequired:boolean;portfolioLimit?:number;editingEnabled?:boolean;lockedReason?:string}){
  const router=useRouter();
  const[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState(''),[category,setCategory]=useState(v?.category??''),[service,setService]=useState(v?.service??''),[city,setCity]=useState(v?.city??''),[coverage,setCoverage]=useState(v?.locations?.length?v.locations:(v?.city?[v.city]:[])),[locationQuery,setLocationQuery]=useState(''),[image,setImage]=useState(v?.image??''),[gallery,setGallery]=useState(v?.gallery??[]),[documents,setDocuments]=useState(v?.documents??[]);
  const services=categories.find(x=>x.name===category)?.services??[];
@@ -30,6 +30,8 @@ export function ProfileForm({vendor:v,categories,locations,email,phone,storageEn
  function markRemoved(kind:'logo'|'portfolio'|'document',index=0){if(kind==='logo')setImage('');if(kind==='portfolio')setGallery(rows=>rows.filter((_,i)=>i!==index));if(kind==='document')setDocuments(rows=>rows.filter((_,i)=>i!==index));setMessage('File removed. Save your profile to finish.');}
  async function upload(file:File,kind:'logo'|'portfolio'|'document'){
   setError('');
+  if(!editingEnabled){setError(lockedReason);return;}
+  if(kind==='portfolio'&&gallery.length>=portfolioLimit){setError(`Your plan allows up to ${portfolioLimit} portfolio photos.`);return;}
   if(file.size>4_000_000){setError('Choose a file smaller than 4 MB.');return;}
   setBusy(true);
   try{
@@ -45,10 +47,13 @@ export function ProfileForm({vendor:v,categories,locations,email,phone,storageEn
   }catch(e){const message=(e as Error).message;setError(message==='Failed to fetch'?'The upload connection failed. Refresh the page and try again.':message);}finally{setBusy(false);}
  }
  return <form className="stack-form profile-form" onSubmit={async e=>{
-  e.preventDefault();setBusy(true);setError('');setMessage('');
+  e.preventDefault();if(!editingEnabled){setError(lockedReason);return;}setBusy(true);setError('');setMessage('');
   const submit=(e.nativeEvent as SubmitEvent).submitter?.getAttribute('value')==='submit';
   try{const data=new FormData(e.currentTarget);await post('profile',{...Object.fromEntries(data),locations:coverage,image,gallery,documents,submit});setMessage(submit?'Profile submitted for review.':'Draft saved.');router.refresh();}catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }}>
+  {!editingEnabled&&<p className="notice plan-lock-note" role="alert">{lockedReason} <Link href="#subscription">Open Plan & billing</Link></p>}
+  {gallery.length>portfolioLimit&&<p className="error" role="alert">Your plan allows {portfolioLimit} portfolio photos. Remove {gallery.length-portfolioLimit} extra photos before saving.</p>}
+  <fieldset className="profile-edit-fields" disabled={!editingEnabled}>
   <section className="form-section" aria-labelledby="business-details-heading">
    <div className="form-section-heading"><span>01</span><div><h3 id="business-details-heading">Business details</h3><p>The essentials customers use to understand and contact your business.</p></div></div>
    <div className="form-grid">
@@ -70,7 +75,7 @@ export function ProfileForm({vendor:v,categories,locations,email,phone,storageEn
    <div className="form-section-heading"><span>03</span><div><h3 id="media-heading">Media & verification</h3><p>Add your identity, portfolio, and private documents for review.</p></div></div>
    <div className="upload-fields">
     <div className="upload-control"><label className="field"><span>Business logo</span><input type="file" accept="image/jpeg,image/png,image/webp" disabled={!storageEnabled||busy} onChange={e=>{const file=e.target.files?.[0];if(file)upload(file,'logo');}}/><small>{image?'Logo uploaded':'JPG, PNG or WebP · 4 MB max'}</small></label>{image&&<button className="upload-remove" type="button" onClick={()=>markRemoved('logo')}>Remove logo</button>}</div>
-    <div className="upload-control"><label className="field"><span>Portfolio images</span><input type="file" accept="image/jpeg,image/png,image/webp" disabled={!storageEnabled||busy||gallery.length>=portfolioLimit} onChange={e=>{const file=e.target.files?.[0];if(file)upload(file,'portfolio');}}/><small>{gallery.length} of {portfolioLimit} images · 4 MB each</small></label><div className="upload-items">{gallery.map((_,i)=><button className="upload-remove" type="button" key={i} onClick={()=>markRemoved('portfolio',i)}>Remove image {i+1}</button>)}</div></div>
+    <div className="upload-control"><label className="field"><span>Portfolio images</span><input type="file" accept="image/jpeg,image/png,image/webp" disabled={!storageEnabled||busy||gallery.length>=portfolioLimit||(v?.gallery.length??0)>=portfolioLimit} onChange={e=>{const file=e.target.files?.[0];if(file)upload(file,'portfolio');}}/><small>{gallery.length} of {portfolioLimit} images · 4 MB each</small>{(v?.gallery.length??0)>=portfolioLimit&&gallery.length<portfolioLimit&&<small>Save your photo removals before uploading replacements.</small>}</label><div className="upload-items">{gallery.map((_,i)=><button className="upload-remove" type="button" key={i} onClick={()=>markRemoved('portfolio',i)}>Remove image {i+1}</button>)}</div></div>
     <div className="upload-control"><label className="field"><span>Verification documents</span><input type="file" accept="application/pdf,image/jpeg,image/png" disabled={!storageEnabled||busy||documents.length>=5} onChange={e=>{const file=e.target.files?.[0];if(file)upload(file,'document');}}/><small>{documents.length} of 5 private files · 4 MB each</small></label><div className="upload-items">{documents.map((_,i)=><button className="upload-remove" type="button" key={i} onClick={()=>markRemoved('document',i)}>Remove document {i+1}</button>)}</div></div>
    </div>
   </section>
@@ -84,6 +89,7 @@ export function ProfileForm({vendor:v,categories,locations,email,phone,storageEn
   <p className="notice">Editing a published profile returns it to draft and removes it from public listings until reviewed again. {storageEnabled?'Uploads are stored privately and opened through short-lived links.':'File uploads will open when private storage is configured.'} {mobileVerificationRequired&&!mobileVerified&&'Verify your account mobile number before submitting for review.'}</p>
   {error&&<p className="error" role="alert">{error}</p>}{message&&<p className="success" role="status">{message}</p>}
   <div className="form-actions"><span>{mobileVerificationRequired&&!mobileVerified?'Save your draft now, then verify your mobile number to submit it.':'Save your progress anytime. Submit only when every section is ready.'}</span><div><button type="submit" className="button outline" disabled={busy} value="draft">Save draft</button><button type="submit" className="button" disabled={busy||(mobileVerificationRequired&&!mobileVerified)} value="submit">{mobileVerificationRequired&&!mobileVerified?'Mobile verification required':'Submit for review'}</button></div></div>
+ </fieldset>
  </form>;
 }
 

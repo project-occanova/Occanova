@@ -9,7 +9,7 @@ const fail=(error:string,status=400)=>NextResponse.json({error},{status});
 
 export async function POST(req:NextRequest,{params}:{params:Promise<{action:string}>}){
  const action=(await params).action;
- if(!['checkout','confirm','cancel'].includes(action))return fail('Not found',404);
+ if(!['checkout','confirm','cancel','status'].includes(action))return fail('Not found',404);
  if(process.env.OCCANOVA_READ_ONLY==='true')return fail('This site is read-only.',503);
  const origin=req.headers.get('origin');
  const expected=process.env.NEXT_PUBLIC_SITE_URL||`${req.nextUrl.protocol}//${req.headers.get('host')}`;
@@ -21,6 +21,15 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{action:stri
  let body:unknown;
  try{body=await req.json();}catch{return fail('Invalid request',400);}
  try{
+  if(action==='status'){
+   const selected=user.subscription;
+   if(!selected?.gatewayId)return fail('No subscription to check.',404);
+   if(await rateLimited(`billing-status:${user.id}`,2,30000))return fail('Please wait a moment before checking again.',429);
+   const remote=await razorpay<RazorpaySubscription>('GET',`subscriptions/${selected.gatewayId}`);
+   if(remote.id!==selected.gatewayId||remote.plan_id!==selected.gatewayPlanId||!knownStatus(remote.status))return fail('Subscription details do not match.',409);
+   await mutate(state=>{const account=state.users.find(item=>item.id===user.id);if(!account?.subscription||account.subscription.gatewayId!==remote.id)return;account.subscription.status=remote.status as typeof account.subscription.status;account.subscription.paidCount=remote.paid_count;account.subscription.updatedAt=new Date().toISOString();});
+   return NextResponse.json({ok:true,status:remote.status});
+  }
   if(action==='checkout'){
    const {plan}=z.object({plan:z.string()}).parse(body);
    if(!isPlanId(plan))return fail('Choose a valid plan.');

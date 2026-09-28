@@ -9,7 +9,7 @@ import {EnquiryTable,MobileVerification,PasswordForm,ProfileForm} from '@/compon
 import {Workspace} from '@/components/workspace';
 import {SubscriptionPanel} from '@/components/subscription-panel';
 import {billingEnabled} from '@/lib/subscriptions';
-import {subscriptionPlans} from '@/lib/plans';
+import {planAccess,portfolioLimit} from '@/lib/plan-access';
 import {paymentsEnabled} from '@/lib/payments';
 
 export const metadata={robots:{index:false,follow:false,noarchive:true}};
@@ -22,6 +22,8 @@ export default async function Dashboard(){
   const s=await readState();
   const v=s.vendors.find(x=>x.userId===user.id);
   const enquiries=s.enquiries.filter(x=>x.vendorId===v?.id);
+  const access=planAccess(user.subscription);
+  const photoLimit=portfolioLimit(user.subscription);
   const completion=v?Math.round([v.name,v.owner,v.category,v.service,v.city,v.description,v.phone,v.whatsapp,v.email,v.image,v.gallery.length].filter(Boolean).length/11*100):0;
   const steps=[
     ['Business details',!!(v?.name&&v.owner&&v.category&&v.service)],
@@ -50,7 +52,7 @@ export default async function Dashboard(){
 
     {mobileOtpEnabled()&&<MobileVerification phone={user.phone} verified={Boolean(user.phoneVerified)} enabled/>}
 
-    <SubscriptionPanel subscription={user.subscription} enabled={billingEnabled()} email={user.email} phone={user.phone}/>
+    <SubscriptionPanel subscription={user.subscription} enabled={billingEnabled()} email={user.email} phone={user.phone} portfolioCount={v?.gallery.length??0} access={access}/>
     {paymentsEnabled()&&<p className="quiet-note"><Link href="/dashboard/payments">Make a one-time payment</Link> for an amount agreed with Occanova.</p>}
 
     <div className="stat-grid workspace-stats">
@@ -64,7 +66,7 @@ export default async function Dashboard(){
 
     <section id="profile" className="panel workspace-section">
       <div className="workspace-section-heading"><div><h2>Business profile</h2><p>Keep your services, locations, media, and public information up to date.</p></div>{v?.published&&v.status==='approved'&&<Link href={'/vendors/'+v.slug}>View public profile</Link>}</div>
-      <ProfileForm vendor={v} categories={s.categories} locations={s.locations} email={user.email} phone={user.phone} storageEnabled={hasStorage()} mobileVerified={Boolean(user.phoneVerified)} mobileVerificationRequired={mobileOtpEnabled()} portfolioLimit={user.subscription?subscriptionPlans[user.subscription.plan].portfolioLimit:12}/>
+      <ProfileForm vendor={v} categories={s.categories} locations={s.locations} email={user.email} phone={user.phone} storageEnabled={hasStorage()} mobileVerified={Boolean(user.phoneVerified)} mobileVerificationRequired={mobileOtpEnabled()} portfolioLimit={photoLimit} editingEnabled={access.allowed} lockedReason={access.reason}/>
     </section>
 
     <section id="enquiries" className="panel workspace-section">

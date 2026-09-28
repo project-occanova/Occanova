@@ -2,11 +2,12 @@ import type { Vendor,User } from './types';
 import {slugify} from './slugs';
 export {slugify} from './slugs';
 import {categoryName,serviceName} from './taxonomy';
+import {listingWithinPlan} from './plan-access';
 export function isFeatured(v:Vendor, now=Date.now()) { return v.featured && (!v.featuredStart || Date.parse(v.featuredStart)<=now) && (!v.featuredEnd || Date.parse(v.featuredEnd+'T23:59:59.999Z')>=now); }
 export function publicVendors(vendors:Vendor[], filter:{category?:string; service?:string; city?:string; q?:string}={},users:User[]=[]){
   filter={...filter,category:filter.category?categoryName(filter.category):undefined,service:filter.service?serviceName(filter.category||'',filter.service):undefined};
   const accounts=new Map(users.map(user=>[user.id,user]));
-  return vendors.filter(v=>v.status==='approved' && v.published && (process.env.SUBSCRIPTIONS_ENABLED!=='true'||v.sample||!accounts.get(v.userId)?.subscription||['authenticated','active'].includes(accounts.get(v.userId)?.subscription?.status||'')) && (!filter.category || slugify(v.category)===slugify(filter.category)) && (!filter.service || slugify(v.service||'')===slugify(filter.service)) && (!filter.city || v.locations.some(l=>slugify(l)===slugify(filter.city!)||slugify(l)==='pan-india')) && (!filter.q || `${v.name} ${v.summary} ${v.category} ${v.service||''}`.toLowerCase().includes(filter.q.toLowerCase())))
+  return vendors.filter(v=>v.status==='approved' && v.published && (v.sample||listingWithinPlan(accounts.get(v.userId)?.subscription,v.gallery.length)) && (!filter.category || slugify(v.category)===slugify(filter.category)) && (!filter.service || slugify(v.service||'')===slugify(filter.service)) && (!filter.city || v.locations.some(l=>slugify(l)===slugify(filter.city!)||slugify(l)==='pan-india')) && (!filter.q || `${v.name} ${v.summary} ${v.category} ${v.service||''}`.toLowerCase().includes(filter.q.toLowerCase())))
     .sort((a,b)=>Number(isFeatured(b))-Number(isFeatured(a)) || (isFeatured(a)&&isFeatured(b)?a.priority-b.priority:0) || a.name.localeCompare(b.name));
 }
 export const money=(n:number)=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(n);

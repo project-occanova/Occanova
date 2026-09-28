@@ -3,6 +3,7 @@ import {useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {planIds,subscriptionPlans,type PlanId} from '@/lib/plans';
 import type {VendorSubscription} from '@/lib/types';
+import type {PlanAccess} from '@/lib/plan-access';
 
 import {openSubscriptionCheckout} from '@/lib/razorpay-checkout';
 
@@ -12,7 +13,7 @@ async function send(action:string,body:unknown){
  if(!response.ok)throw Error(result.error||'Subscription request failed.');
  return result;
 }
-export function SubscriptionPanel({subscription,enabled,email,phone}:{subscription?:VendorSubscription;enabled:boolean;email:string;phone:string}){
+export function SubscriptionPanel({subscription,enabled,email,phone,portfolioCount=0,access}:{subscription?:VendorSubscription;enabled:boolean;email:string;phone:string;portfolioCount?:number;access?:PlanAccess}){
  const router=useRouter();
  const [plan,setPlan]=useState<PlanId>(subscription?.plan||'starter');
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
@@ -35,12 +36,16 @@ export function SubscriptionPanel({subscription,enabled,email,phone}:{subscripti
   setBusy(true);setError('');
   try{await send('cancel',{});setNotice('AutoPay was cancelled.');router.refresh();}catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
+ async function checkStatus(){setBusy(true);setError('');setNotice('');try{const result=await send('status',{});setNotice(`Latest Razorpay billing status: ${result.status}.`);router.refresh();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  return <section id="subscription" className="panel workspace-section subscription-panel">
   <div className="workspace-section-heading"><div><h2>Plan & billing</h2><p>Choose your vendor plan and manage your monthly AutoPay mandate.</p></div><span className="status">{subscription?.status||'Not selected'}</span></div>
   <div className="subscription-summary"><strong>{subscription?subscriptionPlans[subscription.plan].name:'Choose a plan'}</strong><span>{subscription?`₹${subscriptionPlans[subscription.plan].monthlyRupees}/month, including GST, after trial`:'Two months free'}</span>{subscription?.trialEndsAt&&<small>First scheduled charge: {new Date(subscription.trialEndsAt).toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric',timeZone:'Asia/Kolkata'})}</small>}</div>
+  {subscription&&<div className="plan-usage"><span><strong>{portfolioCount} / {subscriptionPlans[subscription.plan].portfolioLimit}</strong> portfolio photos</span>{access?.trial&&<span>2-month free trial · selected plan limits apply</span>}</div>}
+  {subscription&&portfolioCount>subscriptionPlans[subscription.plan].portfolioLimit&&<p className="error" role="alert">Your profile exceeds this plan’s photo limit and is hidden from search. Remove extra photos and save your profile to continue.</p>}
+  {access&&!access.allowed&&<p className="notice plan-lock-note" role="status">{access.reason}</p>}
   {subscription?.status==='halted'&&<p className="error">Razorpay has halted this mandate. Please contact support to restore billing.</p>}
   {!authorized&&<><div className="billing-plan-grid">{planIds.map(id=>{const entry=subscriptionPlans[id];return <label key={id} className={plan===id?'selected':''}><input type="radio" name="billing-plan" checked={plan===id} onChange={()=>setPlan(id)}/><strong>{entry.name}</strong><b>₹{entry.monthlyRupees}<small>/month</small></b><span>{entry.description}</span><small>Up to {entry.portfolioLimit} portfolio photos</small></label>;})}</div><p className="quiet-note">All monthly prices include GST. Your trial schedule is created when you open AutoPay setup. Reauthorizing keeps any remaining trial time. The exact first debit date appears in Razorpay Checkout before you authorize. A small mandate authorization amount may be processed by your payment provider.</p><button type="button" className="button" disabled={!enabled||busy} onClick={authorize}>{busy?'Please wait…':'Authorize AutoPay'}</button>{!enabled&&<p className="notice">Subscription checkout is being configured. Your selected plan is saved; no charge or mandate has been created.</p>}</>}
-  {authorized&&<div className="subscription-actions"><p>AutoPay is {subscription?.status}. To change plans, cancel this mandate and authorize a new one. A new trial is not granted.</p><button type="button" className="button outline" disabled={busy||!enabled} onClick={cancel}>{busy?'Please wait…':'Cancel AutoPay'}</button></div>}
+  {authorized&&<><div className="subscription-actions"><p>AutoPay is {subscription?.status}. To change plans, cancel this mandate and authorize a new one. A new trial is not granted.</p><button type="button" className="button outline" disabled={busy||!enabled} onClick={cancel}>{busy?'Please wait…':'Cancel AutoPay'}</button></div><button type="button" className="button outline" disabled={busy||!enabled} onClick={checkStatus}>Check billing status</button></>}
   {error&&<p className="error" role="alert">{error}</p>}{notice&&<p className="success" role="status">{notice}</p>}
  </section>;
 }

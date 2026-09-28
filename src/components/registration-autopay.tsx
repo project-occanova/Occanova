@@ -4,6 +4,7 @@ import {useRouter} from 'next/navigation';
 import Link from 'next/link';
 import {planIds,subscriptionPlans,type PlanId} from '@/lib/plans';
 import {openSubscriptionCheckout} from '@/lib/razorpay-checkout';
+import {TrialOffer} from './trial-offer';
 
 export function RegistrationAutopay({plan:initial,email,phone,enabled,trialEndsAt:initialDate,hasCheckout:initialCheckout=false,testMode=false}:{plan:PlanId;email:string;phone:string;enabled:boolean;trialEndsAt?:string;hasCheckout?:boolean;testMode?:boolean}){
  const router=useRouter();const[plan,setPlan]=useState(initial),[consent,setConsent]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[trialEndsAt,setTrialEndsAt]=useState(initialDate),[hasCheckout,setHasCheckout]=useState(initialCheckout);
@@ -22,6 +23,7 @@ export function RegistrationAutopay({plan:initial,email,phone,enabled,trialEndsA
   }catch(error){setError((error as Error).message);setBusy(false);}
  }
  return <section className="registration-autopay">
+  <TrialOffer plan={plan}/>
   <ol className="registration-steps" aria-label="Registration progress"><li>1. Plan selected</li><li>2. Email verified</li><li aria-current="step">3. Set up AutoPay</li></ol>
   {testMode&&<p className="notice">Test Mode — use Razorpay test payment details. This setup does not take a live subscription payment.</p>}
   <p>Email verified for <strong>{email}</strong>. Complete AutoPay authorization to create your vendor account.</p>
