@@ -1,7 +1,9 @@
 type CheckoutResponse={razorpay_payment_id:string;razorpay_subscription_id:string;razorpay_signature:string};
-type CheckoutOptions={key:string;subscription_id:string;name:string;description:string;prefill:{email:string;contact:string};theme:{color:string};modal:{ondismiss:()=>void};handler:(response:CheckoutResponse)=>void};
-type CheckoutInstance={open:()=>void;on:(name:string,handler:()=>void)=>void};
-declare global{interface Window{Razorpay?:new(options:CheckoutOptions)=>CheckoutInstance}}
+export type OrderCheckoutResponse={razorpay_payment_id:string;razorpay_order_id:string;razorpay_signature:string};
+type CheckoutFailure={error?:{description?:string}};
+type CheckoutOptions<T>={key:string;subscription_id?:string;order_id?:string;amount?:number;currency?:string;name:string;description:string;prefill:{email:string;contact:string};theme:{color:string};modal:{ondismiss:()=>void};handler:(response:T)=>void};
+type CheckoutInstance={open:()=>void;on:(name:string,handler:(response:CheckoutFailure)=>void)=>void};
+declare global{interface Window{Razorpay?:new<T>(options:CheckoutOptions<T>)=>CheckoutInstance}}
 let loading:Promise<void>|undefined;
 async function load(){
  if(window.Razorpay)return;
@@ -19,4 +21,10 @@ export async function openSubscriptionCheckout(input:{key:string;subscriptionId:
  await load();
  const checkout=new window.Razorpay!({key:input.key,subscription_id:input.subscriptionId,name:'Occanova',description:input.description,prefill:{email:input.email,contact:input.phone},theme:{color:'#315b1c'},modal:{ondismiss:input.onClose},handler:input.onConfirm});
  checkout.on('payment.failed',input.onFailure);checkout.open();
+}
+export async function openOrderCheckout(input:{key:string;orderId:string;amount:number;currency:string;email:string;phone:string;onConfirm:(response:OrderCheckoutResponse)=>void;onClose:()=>void;onFailure:(message:string)=>void}){
+ await load();
+ let confirming=false;
+ const checkout=new window.Razorpay!({key:input.key,order_id:input.orderId,amount:input.amount,currency:input.currency,name:'Occanova',description:'One-time payment',prefill:{email:input.email,contact:input.phone},theme:{color:'#315b1c'},modal:{ondismiss:()=>{if(!confirming)input.onClose();}},handler:(response:OrderCheckoutResponse)=>{confirming=true;input.onConfirm(response);}});
+ checkout.on('payment.failed',response=>input.onFailure(response.error?.description||'Payment failed. Please retry.'));checkout.open();
 }

@@ -13,8 +13,8 @@ type MongoDoc={_id:string;[key:string]:unknown};
 type MetaDoc={_id:string;revision:number;initializedAt?:Date;seedVersion?:number};
 // Increment when the default categories or locations need to be merged again.
 const seedVersion=4;
-const collections:StateList[]=['vendors','users','registrations','enquiries','sessions','tokens','categories','locations','audit'];
-const keys:Record<StateList,string>={vendors:'id',users:'id',registrations:'id',enquiries:'id',sessions:'hash',tokens:'hash',categories:'slug',locations:'slug',audit:'id'};
+const collections:StateList[]=['vendors','users','registrations','paymentOrders','enquiries','sessions','tokens','categories','locations','audit'];
+const keys:Record<StateList,string>={vendors:'id',users:'id',registrations:'id',paymentOrders:'id',enquiries:'id',sessions:'hash',tokens:'hash',categories:'slug',locations:'slug',audit:'id'};
 
 function normalize(state:State):State{
   const seeded=initialState();

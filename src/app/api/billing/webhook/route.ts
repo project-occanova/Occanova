@@ -1,11 +1,12 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {mutate,readState} from '@/lib/store';
 import {activateRegistration} from '@/lib/registration';
-import {billingEnabled,knownStatus,razorpay,validSignature,type RazorpaySubscription} from '@/lib/subscriptions';
+import {billingConfigured,knownStatus,razorpay,validSignature,type RazorpaySubscription} from '@/lib/subscriptions';
 export const runtime='nodejs';
 export async function POST(req:NextRequest){
  const secret=process.env.RAZORPAY_WEBHOOK_SECRET;
- if(!secret||!billingEnabled())return NextResponse.json({error:'Webhook is not configured.'},{status:503});
+ // Provider delivery must stay available while new subscription signups are paused.
+ if(!secret||!billingConfigured())return NextResponse.json({error:'Webhook is not configured.'},{status:503});
  const raw=await req.text();
  if(raw.length>100000)return NextResponse.json({error:'Request too large'},{status:413});
  if(!validSignature(raw,req.headers.get('x-razorpay-signature')||'',secret))return NextResponse.json({error:'Invalid signature'},{status:401});

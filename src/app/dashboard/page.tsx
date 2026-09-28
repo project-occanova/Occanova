@@ -10,6 +10,7 @@ import {Workspace} from '@/components/workspace';
 import {SubscriptionPanel} from '@/components/subscription-panel';
 import {billingEnabled} from '@/lib/subscriptions';
 import {subscriptionPlans} from '@/lib/plans';
+import {paymentsEnabled} from '@/lib/payments';
 
 export const metadata={robots:{index:false,follow:false,noarchive:true}};
 export const dynamic='force-dynamic';
@@ -50,6 +51,7 @@ export default async function Dashboard(){
     {mobileOtpEnabled()&&<MobileVerification phone={user.phone} verified={Boolean(user.phoneVerified)} enabled/>}
 
     <SubscriptionPanel subscription={user.subscription} enabled={billingEnabled()} email={user.email} phone={user.phone}/>
+    {paymentsEnabled()&&<p className="quiet-note"><Link href="/dashboard/payments">Make a one-time payment</Link> for an amount agreed with Occanova.</p>}
 
     <div className="stat-grid workspace-stats">
       <div><span>Review status</span><strong className="capitalize">{v?.status??'Draft'}</strong></div>
