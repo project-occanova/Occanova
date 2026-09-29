@@ -4,12 +4,13 @@ import Link from 'next/link';
 import {Eye,EyeOff,ArrowUpRight} from 'lucide-react';
 import {planIds,subscriptionPlans,type PlanId} from '@/lib/plans';
 import {TrialOffer} from './trial-offer';
+import {SubmitForm} from './submit-form';
 
 export function VendorRegistrationForm(){
  const[plan,setPlan]=useState<PlanId>('starter'),[autopayConsent,setAutopayConsent]=useState(false),[busy,setBusy]=useState(false),[show,setShow]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[verificationUrl,setVerificationUrl]=useState('');
  const details=subscriptionPlans[plan];
  if(message)return <div className="success-state" role="status"><h3>Verify your email next.</h3><p>{message}</p>{verificationUrl?<Link className="button" href={verificationUrl}>Verify email and continue</Link>:<p>Open the verification link in your inbox to set up AutoPay.</p>}<Link href="/resend-verification">Resend verification email</Link><Link href="/login">Resume registration</Link></div>;
- return <form className="stack-form vendor-registration-form" onSubmit={async event=>{
+ return <SubmitForm onEdit={()=>setError('')} className="stack-form vendor-registration-form" onSubmit={async event=>{
   event.preventDefault();setBusy(true);setError('');
   try{const data=Object.fromEntries(new FormData(event.currentTarget));const response=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,plan,consent:data.consent==='on',autopayConsent:data.autopayConsent==='on'})});const result=await response.json();if(!response.ok)throw Error(result.error||'Registration could not start.');setMessage(result.message);setVerificationUrl(result.verificationUrl||'');}
   catch(error){setError((error as Error).message);}finally{setBusy(false);}
@@ -26,5 +27,5 @@ export function VendorRegistrationForm(){
   {error&&<p className="error" role="alert">{error}</p>}
   <button className="button" disabled={busy}>{busy?'Please wait…':'Verify email and continue'}<ArrowUpRight size={17}/></button>
   <p className="auth-bottom">Already started? <Link href="/login">Log in to continue</Link></p>
- </form>;
+ </SubmitForm>;
 }

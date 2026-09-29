@@ -3,6 +3,8 @@ import {redirect,notFound} from 'next/navigation';
 import {currentUser} from '@/lib/auth';
 import {readState} from '@/lib/store';
 import {Workspace} from '@/components/workspace';
+import {ReviewEmailStatus} from '@/components/review-email-status';
+import {reviewLabels} from '@/lib/review-labels';
 import {AdminLifecycleForm,AdminVendorDetailsForm,AdminVendorForm} from '@/components/forms';
 import {mobileOtpEnabled} from '@/lib/config';
 import {subscriptionPlans} from '@/lib/plans';
@@ -13,9 +15,9 @@ export default async function Review({params}:{params:Promise<{id:string}>}){
  const {id}=await params;const state=await readState();const v=state.vendors.find(x=>x.id===id);if(!v)notFound();const account=state.users.find(x=>x.id===v.userId);
  return <Workspace admin email={user.email}>
   <Link className="back-link" href="/admin">← Back to all vendors</Link>
-  <header id="overview" className="workspace-intro review-intro"><div><h1>{v.name}</h1><p>{v.category} · {v.service||'General service'} · {v.city}{v.sample?' · Sample listing':''}</p></div><span className={'status '+v.status}>{v.status}</span></header>
+  <header id="overview" className="workspace-intro review-intro"><div><h1>{v.name}</h1><p>{v.category} · {v.service||'General service'} · {v.city}{v.sample?' · Sample listing':''}</p></div><span className={'status '+v.status}>{reviewLabels[v.status]}</span></header>
   <div className="review-summary"><div><span>Primary city</span><strong>{v.city}</strong></div><div><span>Service areas</span><strong>{v.locations.length}</strong></div><div><span>Portfolio images</span><strong>{v.gallery.length}</strong></div><div><span>Listing</span><strong>{isPublicVendor(v,account)?'Public':'Hidden'}</strong></div></div>
-  <section className="panel workspace-section review-decision"><div className="workspace-section-heading"><div><h2>Review & visibility</h2><p>Approve the profile, control public visibility, and record a clear decision.</p></div></div><AdminVendorForm vendor={v}/></section>
+  <section className="panel workspace-section review-decision"><div className="workspace-section-heading"><div><h2>Review & visibility</h2><p>Approve the profile, control public visibility, and record a clear decision.</p></div></div><AdminVendorForm key={`${v.status}:${v.submittedAt||''}:${v.reviewedAt||''}`} vendor={v}/><ReviewEmailStatus vendorId={v.id} notification={account?.notifications?.find(row=>row.vendorId===v.id&&row.kind!=='submitted')}/></section>
   <section className="panel workspace-section"><div className="workspace-section-heading"><div><h2>Business information</h2><p>Review and correct the vendor’s public details before approval.</p></div></div><AdminVendorDetailsForm vendor={v} categories={state.categories} locations={state.locations}/></section>
   <div className="two-panels workspace-section-grid">
    <section className="panel workspace-section"><div className="workspace-section-heading"><div><h2>Media & verification</h2><p>Review public portfolio media and private verification documents.</p></div></div><h3>Portfolio</h3>{v.gallery.length?<div className="review-gallery">{v.gallery.map((x,i)=><a href={x} key={x} target="_blank" rel="noreferrer"><img src={x} alt={`Portfolio ${i+1}`}/></a>)}</div>:<p className="notice">No portfolio images have been uploaded.</p>}<h3>Verification documents</h3>{v.documents?.length?<div className="document-links">{v.documents.map((x,i)=><a href={x} key={x} target="_blank" rel="noreferrer">Open document {i+1}</a>)}</div>:<p className="notice">No verification documents have been uploaded.</p>}<dl className="review-details"><div><dt>Public slug</dt><dd>{v.slug}</dd></div><div><dt>Listing type</dt><dd>{v.sample?'Illustrative sample':'Vendor account'}</dd></div></dl></section>

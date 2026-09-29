@@ -1,14 +1,19 @@
-import type {Enquiry,Vendor} from './types';
+import type {Enquiry,Vendor,VendorNotification} from './types';
 import {localPreview,siteUrl} from './config';
 import {subscriptionPlans,type PlanId} from './plans';
 
 const esc=(value:string)=>value.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 
-async function send(to:string|string[],subject:string,html:string,text:string){
+async function send(to:string|string[],subject:string,html:string,text:string,idempotencyKey?:string){
   const apiKey=process.env.RESEND_API_KEY,from=process.env.EMAIL_FROM;
   if(!apiKey||!from){if(localPreview())return;throw Error('Email delivery is not configured.');}
-  const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({from,to:Array.isArray(to)?to:[to],subject,html,text}),signal:AbortSignal.timeout(10000)});
+  const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json',...(idempotencyKey?{'Idempotency-Key':idempotencyKey}:{})},body:JSON.stringify({from,to:Array.isArray(to)?to:[to],subject,html,text}),signal:AbortSignal.timeout(10000)});
   if(!response.ok){const detail=await response.text();console.error('Resend delivery failed',response.status,detail.slice(0,300));throw Error('We could not send the email. Please try again.');}
+}
+
+export function sendVendorUpdateEmail(email:string,notice:VendorNotification){
+ const href=`${siteUrl()}${notice.href}`;
+ return send(email,`Occanova: ${notice.title}`,`<h1>${esc(notice.title)}</h1><p>${esc(notice.message)}</p><p><a href="${esc(href)}">Open your update</a></p><p>Manage your profile in your <a href="${siteUrl()}/dashboard">vendor studio</a>. For help, contact info@occanova.com.</p>`,`${notice.title}\n${notice.message}\n${href}\nVendor studio: ${siteUrl()}/dashboard\nSupport: info@occanova.com`,`vendor-update/${notice.id}`);
 }
 
 export const sendVerificationEmail=(email:string,value:string)=>send(email,'Verify your Occanova vendor account',`<h1>Welcome to Occanova</h1><p>Verify your email to finish creating your vendor account.</p><p><a href="${siteUrl()}/verify?token=${value}">Verify email</a></p><p>This link expires in 24 hours.</p>`,`Verify your Occanova account: ${siteUrl()}/verify?token=${value}\nThis link expires in 24 hours.`);

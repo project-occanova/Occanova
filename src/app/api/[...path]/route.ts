@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { mutate,readState } from '@/lib/store';
 import { currentUser,hashPassword,checkPassword,token,digest,cookieOptions,portalAllowed } from '@/lib/auth';
-import { registerSchema,enquirySchema,profileSchema,adminVendorProfileSchema,vendorLifecycleSchema } from '@/lib/validation';
+import { registerSchema,enquirySchema,profileSchema,draftProfileSchema,adminVendorProfileSchema,vendorLifecycleSchema } from '@/lib/validation';
 import { slugify,publicVendors,publicVendorProfile } from '@/lib/directory';
 import {backendReady,hasDatabase,hasEmail,hasMobileOtp,hasStorage,localPreview,mobileOtpEnabled,publicIntakeEnabled,readOnlyDeployment} from '@/lib/config';
 import {rateLimited} from '@/lib/rate-limit';
@@ -16,11 +16,21 @@ import {assertPlanAccess,assertPortfolioLimit,PlanAccessError} from '@/lib/plan-
 import {startRegistration} from '@/lib/registration';
 import {registrationCookie,registrationCookieOptions} from '@/lib/registration-session';
 import {issuePasswordReset,resetAccountPassword} from '@/lib/password-reset';
+import {validationFeedback} from '@/lib/form-feedback';
+import {notifyVendor,reviewNotificationKind,markNotificationsRead} from '@/lib/vendor-notifications';
+import {deliverReviewNotification} from '@/lib/review-delivery';
+import {workspaceVersion} from '@/lib/workspace-version';
 export const runtime='nodejs';
 const fail=(message:string,status=400)=>NextResponse.json({error:message},{status});
 export async function GET(req:NextRequest,{params}:{params:Promise<{path:string[]}>}) {
  const route=(await params).path.join('/');
  if(route==='health')return NextResponse.json({ok:true,database:hasDatabase(),email:hasEmail(),mobileOtp:hasMobileOtp(),subscriptions:billingEnabled(),storage:hasStorage(),writable:backendReady()&&!readOnlyDeployment(),intake:publicIntakeEnabled()});
+ if(route==='workspace-status'){
+  const value=(await cookies()).get('occanova_session')?.value;if(!value)return fail('Please sign in.',401);
+  const state=await readState();const session=state.sessions.find(row=>row.hash===digest(value)&&row.expires>Date.now());const user=state.users.find(row=>row.id===session?.userId);
+  if(!user)return fail('Please sign in.',401);
+  return NextResponse.json({version:workspaceVersion(state,user)},{headers:{'Cache-Control':'private, no-store'}});
+ }
  if(route==='maintenance/storage'){
   if(!hasStorage())return NextResponse.json({ok:true,skipped:true,reason:'Private file storage is not configured.'});
   const secret=process.env.CRON_SECRET;if(!secret)return fail('Maintenance is not configured.',503);
@@ -112,6 +122,11 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
   if(route==='auth/reset'){const v=z.object({token:z.string().length(64),password:z.string().min(10).max(128)}).parse(b);await mutate(s=>resetAccountPassword(s,digest(v.token),hashPassword(v.password)));return NextResponse.json({ok:true});}
   if(route==='enquiries') {const v=enquirySchema.parse(b);const saved=await mutate(s=>{const vendor=publicVendors(s.vendors,{},s.users).find(x=>x.id===v.vendorId&&!x.sample);if(!vendor)throw Error('This vendor is unavailable.');const {website,...data}=v;void website;const enquiry={...data,id:randomUUID(),status:'new' as const,createdAt:new Date().toISOString()};s.enquiries.push(enquiry);return {enquiry,vendor};});let delivered=true;try{await sendEnquiryNotifications(saved.enquiry,saved.vendor);}catch{delivered=false;}return NextResponse.json({ok:true,id:saved.enquiry.id,message:localPreview()?'Enquiry saved in this local preview. No notification was sent.':delivered?'Your enquiry has been sent to the vendor.':'Your enquiry was saved. The email notification is delayed.'});}
   const user=await currentUser();if(!user)return fail('Please sign in.',401);
+  if(route==='notifications/read'){
+   const {ids}=z.object({ids:z.array(z.string().uuid()).min(1).max(30)}).parse(b);
+   await mutate(state=>{const owner=state.users.find(row=>row.id===user.id);if(!owner)throw Error('Access denied');markNotificationsRead(owner,ids);});
+   return NextResponse.json({ok:true});
+  }
   if(route==='auth/mobile/send'){
    if(user.role!=='vendor')return fail('Vendor access required',403);
    if(user.phoneVerified)return NextResponse.json({ok:true,verified:true,message:'Your mobile number is already verified.'});
@@ -147,19 +162,66 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
    if(!approved)return fail('The verification code is incorrect or expired.',400);
    return NextResponse.json({ok:true,verified:true,message:'Mobile number verified successfully.'});
   }
-  if(route==='profile') {if(user.role!=='vendor')return fail('Vendor access required',403);if(b.submit===true&&mobileOtpEnabled()&&!user.phoneVerified)return fail('Verify your mobile number before submitting your profile for review.',403);assertPlanAccess(user.subscription);const v=profileSchema.parse(b);assertPortfolioLimit(user.subscription,v.gallery.length);const coverage=[...new Set([v.city,...(v.locations??[])])];const owned=(value:string,kind?:string)=>{if(!value)return true;if(!value.startsWith('/api/media?'))return false;const key=new URL(value,'http://local').searchParams.get('key')||'';return validVendorKey(key)&&key.startsWith(`vendors/${user.id}/`)&&(!kind||key.includes(`/${kind}/`));};if(!owned(v.image,'logo')||v.gallery.some(x=>!owned(x,'portfolio'))||v.documents.some(x=>!owned(x,'document')))return fail('Invalid uploaded file reference',403);const result=await mutate(s=>{const account=s.users.find(x=>x.id===user.id);if(!account)throw Error('Access denied');assertPlanAccess(account.subscription);assertPortfolioLimit(account.subscription,v.gallery.length);const category=s.categories.find(x=>x.active&&x.name===v.category);if(!category||!category.services?.includes(v.service)||!coverage.every(location=>s.locations.some(x=>x.active&&x.name===location)))throw Error('Choose an active category, specialisation, and location.');let vendor=s.vendors.find(x=>x.userId===user.id);if(vendor?.status==='suspended'||vendor?.status==='inactive')throw Error('Contact Occanova to reactivate your account.');const previous=vendor?new Set(vendorStorageKeys(vendor)):new Set<string>();if(!vendor){vendor={id:randomUUID(),userId:user.id,slug:slugify(v.name)+'-'+randomUUID().slice(0,6),status:'draft',published:false,featured:false,priority:100,featuredStart:'',featuredEnd:'',remarks:'',sample:false,...v,locations:coverage};s.vendors.push(vendor);}else{Object.assign(vendor,v,{locations:coverage,status:'draft',published:false});}if(b.submit===true)vendor.status='pending';const retained=new Set(vendorStorageKeys(vendor));return {vendor,obsolete:[...previous].filter(key=>!retained.has(key))};});if(hasStorage()&&result.obsolete.length)try{await deleteUploads(result.obsolete);}catch(error){console.error('Upload cleanup failed; scheduled maintenance will retry.',error);}return NextResponse.json({ok:true,vendor:result.vendor});}
+  if(route==='profile') {
+   if(user.role!=='vendor')return fail('Vendor access required',403);
+   if(b.submit===true&&mobileOtpEnabled()&&!user.phoneVerified)return fail('Verify your mobile number before submitting your profile for review.',403);
+   assertPlanAccess(user.subscription);const v=(b.submit===true?profileSchema:draftProfileSchema).parse(b);assertPortfolioLimit(user.subscription,v.gallery.length);
+   const coverage=[...new Set([v.city,...(v.locations??[])].filter(Boolean))];
+   const owned=(value:string,kind?:string)=>{if(!value)return true;if(!value.startsWith('/api/media?'))return false;const key=new URL(value,'http://local').searchParams.get('key')||'';return validVendorKey(key)&&key.startsWith(`vendors/${user.id}/`)&&(!kind||key.includes(`/${kind}/`));};
+   if(!owned(v.image,'logo')||v.gallery.some(x=>!owned(x,'portfolio'))||v.documents.some(x=>!owned(x,'document')))return fail('Invalid uploaded file reference',403);
+   const result=await mutate(s=>{
+    const account=s.users.find(x=>x.id===user.id);if(!account)throw Error('Access denied');assertPlanAccess(account.subscription);assertPortfolioLimit(account.subscription,v.gallery.length);
+    const category=s.categories.find(x=>x.active&&x.name===v.category);if((v.category&&!category)||(v.service&&!category?.services?.includes(v.service))||!coverage.every(location=>s.locations.some(x=>x.active&&x.name===location)))throw Error('Choose an active category, specialisation, and location.');
+    let vendor=s.vendors.find(x=>x.userId===user.id);if(vendor?.status==='suspended'||vendor?.status==='inactive')throw Error('Contact Occanova to reactivate your account.');
+    const previous=vendor?new Set(vendorStorageKeys(vendor)):new Set<string>();
+    const changed=!vendor||Object.entries(v).some(([key,value])=>JSON.stringify((vendor as Record<string,unknown>)[key])!==JSON.stringify(value));
+    const newlySubmitted=b.submit===true&&(vendor?.status!=='pending'||changed);
+    if(!vendor){vendor={id:randomUUID(),userId:user.id,slug:slugify(v.name||'vendor')+'-'+randomUUID().slice(0,6),status:'draft',published:false,featured:false,priority:100,featuredStart:'',featuredEnd:'',remarks:'',sample:false,...v,locations:coverage};s.vendors.push(vendor);}
+    else Object.assign(vendor,v,{locations:coverage,status:'draft',published:false});
+    let notification;
+    if(b.submit===true){vendor.status='pending';vendor.remarks='';delete vendor.reviewedAt;if(newlySubmitted){vendor.submittedAt=new Date().toISOString();notification=notifyVendor(s,vendor,'submitted');s.audit.unshift({id:randomUUID(),actor:user.email,action:'Vendor profile submitted for review',target:vendor.name,remarks:'Waiting for an approval decision',at:vendor.submittedAt});}}
+    const retained=new Set(vendorStorageKeys(vendor));return {vendor,obsolete:[...previous].filter(key=>!retained.has(key)),notification};
+   });
+   if(hasStorage()&&result.obsolete.length)try{await deleteUploads(result.obsolete);}catch(error){console.error('Upload cleanup failed; scheduled maintenance will retry.',error);}
+   const emailStatus=result.notification?await deliverReviewNotification(result.notification.userId,result.notification.notice.id):undefined;
+   return NextResponse.json({ok:true,vendor:result.vendor,emailStatus});
+  }
   if(route==='password'){const v=z.object({current:z.string().max(128),password:z.string().min(10).max(128)}).parse(b);if(!checkPassword(v.current,user.passwordHash))return fail('Current password is incorrect.');await mutate(s=>{s.users.find(x=>x.id===user.id)!.passwordHash=hashPassword(v.password);s.sessions=s.sessions.filter(x=>x.userId!==user.id);});(await cookies()).delete('occanova_session');return NextResponse.json({ok:true});}
   if(route==='enquiry-status'){const v=z.object({id:z.string(),status:z.enum(['new','contacted','closed'])}).parse(b);await mutate(s=>{const e=s.enquiries.find(x=>x.id===v.id);if(!e)throw Error('Enquiry not found');if(user.role!=='admin'&&!s.vendors.some(x=>x.id===e.vendorId&&x.userId===user.id))throw Error('Access denied');e.status=v.status;});return NextResponse.json({ok:true});}
   if(user.role!=='admin')return fail('Admin access required',403);
   if(route==='admin/vendor-profile'){const v=adminVendorProfileSchema.parse(b);const coverage=[...new Set([v.city,...(v.locations??[])])];await mutate(s=>{const category=s.categories.find(x=>x.active&&x.name===v.category);if(!category||!category.services?.includes(v.service)||!coverage.every(location=>s.locations.some(x=>x.active&&x.name===location)))throw Error('Choose an active category, specialisation, and location.');const vendor=s.vendors.find(x=>x.id===v.id);if(!vendor)throw Error('Vendor not found');const {id,...profile}=v;void id;Object.assign(vendor,profile,{locations:coverage});s.audit.unshift({id:randomUUID(),actor:user.email,action:'Vendor profile updated by administrator',target:vendor.name,remarks:'Business details corrected in the admin studio',at:new Date().toISOString()});});return NextResponse.json({ok:true});}
   if(route==='admin/vendor-lifecycle'){const v=vendorLifecycleSchema.parse(b);await mutate(s=>{const vendor=s.vendors.find(x=>x.id===v.id);if(!vendor)throw Error('Vendor not found');if(!vendor.userId)throw Error('This listing does not have a vendor account.');if(v.action==='deactivate'){vendor.status='inactive';vendor.published=false;vendor.featured=false;s.sessions=s.sessions.filter(x=>x.userId!==vendor.userId);s.tokens=s.tokens.filter(x=>x.userId!==vendor.userId);}else{vendor.status='draft';vendor.published=false;vendor.featured=false;}s.audit.unshift({id:randomUUID(),actor:user.email,action:v.action==='deactivate'?'Vendor account deactivated':'Vendor account reactivated to draft',target:vendor.name,remarks:v.remarks,at:new Date().toISOString()});});return NextResponse.json({ok:true});}
-  if(route==='admin/vendor') {const v=z.object({id:z.string(),status:z.enum(['draft','pending','approved','rejected','suspended','inactive']),published:z.boolean(),featured:z.boolean(),priority:z.coerce.number().int().min(0).max(10000),featuredStart:z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/),featuredEnd:z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/),remarks:z.string().trim().min(3).max(1000)}).parse(b);if(v.featuredStart&&v.featuredEnd&&v.featuredStart>v.featuredEnd)return fail('Featured end must follow start.');await mutate(s=>{const vendor=s.vendors.find(x=>x.id===v.id);if(!vendor)throw Error('Vendor not found');const account=s.users.find(x=>x.id===vendor.userId);if(v.status==='approved'&&vendor.userId&&mobileOtpEnabled()&&!account?.phoneVerified)throw Error('Mobile verification is required before approval.');if(v.status==='approved'&&vendor.userId){assertPlanAccess(account?.subscription);assertPortfolioLimit(account?.subscription,vendor.gallery.length);}Object.assign(vendor,v,{published:v.status==='approved'&&v.published,featured:v.status==='approved'&&v.featured});if((v.status==='inactive'||v.status==='suspended')&&vendor.userId){s.sessions=s.sessions.filter(x=>x.userId!==vendor.userId);s.tokens=s.tokens.filter(x=>x.userId!==vendor.userId);}s.audit.unshift({id:randomUUID(),actor:user.email,action:`Vendor set to ${v.status}; published ${vendor.published}; featured ${vendor.featured}`,target:vendor.name,remarks:v.remarks,at:new Date().toISOString()});});return NextResponse.json({ok:true});}
+  if(route==='admin/vendor') {
+   const v=z.object({id:z.string(),status:z.enum(['draft','pending','approved','rejected','suspended','inactive']),published:z.boolean(),featured:z.boolean(),priority:z.coerce.number().int().min(0).max(10000),featuredStart:z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/),featuredEnd:z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/),remarks:z.string().trim().min(3).max(1000)}).parse(b);
+   if(v.featuredStart&&v.featuredEnd&&v.featuredStart>v.featuredEnd)return fail('Featured end must follow start.');
+   const notification=await mutate(s=>{
+    const vendor=s.vendors.find(x=>x.id===v.id);if(!vendor)throw Error('Vendor not found');const account=s.users.find(x=>x.id===vendor.userId);
+    if(v.status==='approved'&&vendor.userId&&mobileOtpEnabled()&&!account?.phoneVerified)throw Error('Mobile verification is required before approval.');
+    if(v.status==='approved'&&vendor.userId){profileSchema.parse(vendor);assertPlanAccess(account?.subscription);assertPortfolioLimit(account?.subscription,vendor.gallery.length);}
+    const before={status:vendor.status,published:vendor.published};
+    Object.assign(vendor,v,{published:v.status==='approved'&&v.published,featured:v.status==='approved'&&v.featured});
+    if(v.status==='approved'||v.status==='rejected')vendor.reviewedAt=new Date().toISOString();
+    if((v.status==='inactive'||v.status==='suspended')&&vendor.userId){s.sessions=s.sessions.filter(x=>x.userId!==vendor.userId);s.tokens=s.tokens.filter(x=>x.userId!==vendor.userId);}
+    s.audit.unshift({id:randomUUID(),actor:user.email,action:`Vendor set to ${v.status}; published ${vendor.published}; featured ${vendor.featured}`,target:vendor.name,remarks:v.remarks,at:new Date().toISOString()});
+    const kind=reviewNotificationKind(before,vendor);return kind?notifyVendor(s,vendor,kind):undefined;
+   });
+   const emailStatus=notification?await deliverReviewNotification(notification.userId,notification.notice.id):undefined;
+   return NextResponse.json({ok:true,message:notification?emailStatus==='sent'?'Decision saved. The vendor has a dashboard update and an email has been sent.':'Decision saved. The vendor has a dashboard update; email could not be sent.':'Decision saved and activity logged.',emailStatus});
+  }
+  if(route==='admin/vendor-notification'){
+   const {id,notificationId}=z.object({id:z.string().min(1).max(100),notificationId:z.string().uuid()}).parse(b);
+   if(await rateLimited(`review-email:${user.id}:${notificationId}`,2,60000))return fail('Please wait a moment before retrying the email.',429);
+   const state=await readState();const vendor=state.vendors.find(row=>row.id===id);const owner=state.users.find(row=>row.id===vendor?.userId);
+   if(!owner?.notifications?.some(row=>row.id===notificationId&&row.vendorId===id))return fail('Vendor update not found.',404);
+   const emailStatus=await deliverReviewNotification(owner.id,notificationId);
+   return NextResponse.json({ok:true,emailStatus,message:emailStatus==='sent'?'Email sent to the vendor’s registered address.':emailStatus==='unchanged'?'Email is already sent or currently being processed.':'Email could not be sent. The dashboard update remains available.'});
+  }
   if(route==='admin/taxonomy'){const v=z.object({type:z.enum(['categories','locations']),name:z.string().trim().min(2).max(80),active:z.boolean(),firstService:z.string().trim().max(100).optional()}).parse(b);await mutate(s=>{const row=s[v.type].find(x=>x.slug===slugify(v.name));if(row)row.active=v.active;else {if(v.type==='categories'&&!v.firstService?.trim())throw Error('Add the first subcategory with a new category.');s[v.type].push({name:v.name,slug:slugify(v.name),active:v.active,...(v.type==='categories'?{services:[v.firstService!],phase:2 as const}:{})});}s.audit.unshift({id:randomUUID(),actor:user.email,action:`${v.type}: ${v.active?'activated':'deactivated'}`,target:v.name,remarks:'Taxonomy updated',at:new Date().toISOString()});});return NextResponse.json({ok:true});}
   if(route==='admin/subcategory'){const v=z.object({category:z.string().min(2).max(80),name:z.string().trim().min(2).max(100)}).parse(b);await mutate(s=>{const category=s.categories.find(x=>x.slug===v.category);if(!category)throw Error('Choose an active category.');if(category.services?.some(name=>slugify(name)===slugify(v.name)))throw Error('This subcategory already exists.');category.services=[...(category.services??[]),v.name];s.audit.unshift({id:randomUUID(),actor:user.email,action:'Subcategory added',target:category.name,remarks:v.name,at:new Date().toISOString()});});return NextResponse.json({ok:true});}
   return fail('Not found',404);
  }catch(e){
   if(e instanceof PlanAccessError)return fail(e.message,e.status);
-  if(e instanceof z.ZodError)return fail(e.issues[0]?.message??'Check the form fields');
+  if(e instanceof z.ZodError)return fail(e.issues[0]?validationFeedback(e.issues[0]):'Check the form fields');
   if(e instanceof SyntaxError)return fail('Invalid JSON');
   if(e&&typeof e==='object'&&'code' in e&&e.code===11000)return fail('An account already uses this email or phone.',409);
   const safe=['Agree to recurring AutoPay','Registration is already in progress','An account already uses','This verification link','Email/mobile or password','Verify your email','This reset link','This vendor is unavailable','This listing does not have','Choose an active','Add the first subcategory','This subcategory already exists','Contact Occanova','Current password','Enquiry not found','Access denied','Administrator access','Use the separate administrator','Vendor not found','Featured end','Private file storage','Choose an allowed','Public registration','Public enquiries','Mobile verification','Your account does not have','Too many verification','Too many incorrect','The verification code','The verification message','The mobile verification service','Verify your mobile','Vendor plan authorization'];
