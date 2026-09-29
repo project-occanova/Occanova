@@ -1,12 +1,14 @@
 'use client';
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
 import {ArrowUpRight,CheckCircle2,Eye,EyeOff,ShieldCheck,Smartphone} from 'lucide-react';
-import type {Vendor,Taxon,Enquiry} from '@/lib/types';
+import type {Vendor,Taxon} from '@/lib/types';
 import {VendorRegistrationForm} from './vendor-registration-form';
 import {SubmitForm} from './submit-form';
 import {reviewLabels} from '@/lib/review-labels';
+import {ProfilePreview} from './profile-preview';
+export {EnquiryTable} from './enquiry-inbox';
 export async function post(path:string,data:unknown){const r=await fetch('/api/'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const b=await r.json();if(!r.ok)throw Error(b.error||'Something went wrong. Please try again.');if(['profile','admin/vendor','admin/vendor-profile','admin/vendor-lifecycle','password'].includes(path))window.dispatchEvent(new Event('occanova:form-saved'));return b;}
 function formData(f:HTMLFormElement){return Object.fromEntries(new FormData(f));}
 export function Field({label,name,type='text',value,required=true,placeholder,min,minLength,maxLength}:{label:string;name:string;type?:string;value?:string|number;required?:boolean;placeholder?:string;min?:string|number;minLength?:number;maxLength?:number}){return <label className="field"><span>{label}</span><input name={name} type={type} defaultValue={value} required={required} placeholder={placeholder} min={min} minLength={minLength??(['name','owner'].includes(name)?2:name==='summary'?10:undefined)} maxLength={maxLength??180}/></label>;}
@@ -25,11 +27,14 @@ export function MobileVerification({phone,verified,enabled}:{phone:string;verifi
 
 export function ProfileForm({vendor:v,categories,locations,email,phone,storageEnabled,mobileVerified,mobileVerificationRequired,portfolioLimit=10,editingEnabled=true,lockedReason=''}:{vendor?:Vendor;categories:Taxon[];locations:Taxon[];email:string;phone:string;storageEnabled:boolean;mobileVerified:boolean;mobileVerificationRequired:boolean;portfolioLimit?:number;editingEnabled?:boolean;lockedReason?:string}){
  const router=useRouter();
+ const[dirty,setDirty]=useState(false);
+ useEffect(()=>{if(!dirty)return;function warn(event:BeforeUnloadEvent){event.preventDefault();event.returnValue='';}window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[dirty]);
+ function markEdited(){setDirty(true);setMessage('');window.dispatchEvent(new Event('occanova:form-dirty'));}
  const[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState(''),[category,setCategory]=useState(v?.category??''),[service,setService]=useState(v?.service??''),[city,setCity]=useState(v?.city??''),[coverage,setCoverage]=useState(v?.locations?.length?v.locations:(v?.city?[v.city]:[])),[locationQuery,setLocationQuery]=useState(''),[image,setImage]=useState(v?.image??''),[gallery,setGallery]=useState(v?.gallery??[]),[documents,setDocuments]=useState(v?.documents??[]);
  const services=categories.find(x=>x.name===category)?.services??[];
  const availableLocations=locations.filter(x=>x.active&&x.name.toLowerCase().includes(locationQuery.toLowerCase()));
  function chooseLocation(name:string,checked:boolean){setCoverage(rows=>name==='Pan India'?(checked?['Pan India']:[]):checked?[...new Set([...rows.filter(x=>x!=='Pan India'),name])]:rows.filter(x=>x!==name));}
- function markRemoved(kind:'logo'|'portfolio'|'document',index=0){if(kind==='logo')setImage('');if(kind==='portfolio')setGallery(rows=>rows.filter((_,i)=>i!==index));if(kind==='document')setDocuments(rows=>rows.filter((_,i)=>i!==index));setMessage('File removed. Save your profile to finish.');}
+ function markRemoved(kind:'logo'|'portfolio'|'document',index=0){markEdited();if(kind==='logo')setImage('');if(kind==='portfolio')setGallery(rows=>rows.filter((_,i)=>i!==index));if(kind==='document')setDocuments(rows=>rows.filter((_,i)=>i!==index));setMessage('File removed. Save your profile to finish.');}
  async function upload(file:File,kind:'logo'|'portfolio'|'document'){
   setError('');
   if(!editingEnabled){setError(lockedReason);return;}
@@ -45,17 +50,18 @@ export function ProfileForm({vendor:v,categories,locations,email,phone,storageEn
    if(kind==='logo')setImage(path);
    if(kind==='portfolio')setGallery(rows=>[...rows,path].slice(0,portfolioLimit));
    if(kind==='document')setDocuments(rows=>[...rows,path].slice(0,5));
-   setMessage('File uploaded. Save your profile to keep it.');
+   markEdited();setMessage('File uploaded. Save your profile to keep it.');
   }catch(e){const message=(e as Error).message;setError(message==='Failed to fetch'?'The upload connection failed. Refresh the page and try again.':message);}finally{setBusy(false);}
  }
- return <SubmitForm allowIncompleteDraft onEdit={()=>setError('')} className="stack-form profile-form" onSubmit={async e=>{
+ return <SubmitForm allowIncompleteDraft onEdit={()=>setError('')} onInput={event=>{if(event.target instanceof Element&&event.target.getAttribute('name'))markEdited();}} onChange={event=>{if(event.target instanceof Element&&event.target.getAttribute('name'))markEdited();}} className="stack-form profile-form" onSubmit={async e=>{
   e.preventDefault();if(!editingEnabled){setError(lockedReason);return;}setBusy(true);setError('');setMessage('');
   const submit=(e.nativeEvent as SubmitEvent).submitter?.getAttribute('value')==='submit';
-  try{const data=new FormData(e.currentTarget);await post('profile',{...Object.fromEntries(data),locations:coverage,image,gallery,documents,submit});setMessage(submit?'Your profile is submitted. Track the decision in Profile progress above.':'Draft saved. You can finish the remaining details later.');router.refresh();if(submit)requestAnimationFrame(()=>document.querySelector('#review-status')?.scrollIntoView({behavior:'smooth',block:'start'}));}catch(e){setError((e as Error).message);}finally{setBusy(false);}
+  try{const data=new FormData(e.currentTarget);await post('profile',{...Object.fromEntries(data),locations:coverage,image,gallery,documents,submit});setDirty(false);setMessage(submit?'Your profile is submitted. Track the decision in Profile progress above.':'Draft saved. You can finish the remaining details later.');router.refresh();if(submit)requestAnimationFrame(()=>document.querySelector('#review-status')?.scrollIntoView({behavior:'smooth',block:'start'}));}catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }}>
   {!editingEnabled&&<p className="notice plan-lock-note" role="alert">{lockedReason} <Link href="#subscription">Open Plan & billing</Link></p>}
   {gallery.length>portfolioLimit&&<p className="error" role="alert">Your plan allows {portfolioLimit} portfolio photos. Remove {gallery.length-portfolioLimit} extra photos before saving.</p>}
   <fieldset className="profile-edit-fields" disabled={!editingEnabled||busy}>
+  <div className="form-actions profile-action-bar"><div className="profile-save-state" role="status"><strong>{busy?'Saving…':dirty?'Unsaved changes':'Ready to edit'}</strong><span>{dirty?'Save your draft to keep these edits.':'Preview your profile before submitting.'}</span></div><div className="profile-action-buttons"><ProfilePreview image={image} gallery={gallery} coverage={coverage}/><button type="submit" className="button outline" disabled={busy} value="draft">Save draft</button><button type="submit" className="button" disabled={busy||(mobileVerificationRequired&&!mobileVerified)} value="submit">Submit for review</button></div>{(error||message)&&<div className="profile-feedback">{error&&<p className="error" role="alert">{error}</p>}{message&&<p className="success" role="status">{message}</p>}</div>}</div>
   <section className="form-section" aria-labelledby="business-details-heading">
    <div className="form-section-heading"><span>01</span><div><h3 id="business-details-heading">Business details</h3><p>The essentials customers use to understand and contact your business.</p></div></div>
    <div className="form-grid">
@@ -89,16 +95,10 @@ export function ProfileForm({vendor:v,categories,locations,email,phone,storageEn
   </section>
 
   <p className="notice">Saving changes to a published or pending profile returns it to draft. Submit it again when you’re ready for another review. {storageEnabled?'Uploads are stored privately and opened through short-lived links.':'File uploads will open when private storage is configured.'} {mobileVerificationRequired&&!mobileVerified&&'Verify your account mobile number before submitting for review.'}</p>
-  {error&&<p className="error" role="alert">{error}</p>}{message&&<p className="success" role="status">{message}</p>}
-  <div className="form-actions"><span>{mobileVerificationRequired&&!mobileVerified?'Save your draft now, then verify your mobile number to submit it.':'Save your progress anytime. Submit only when every section is ready.'}</span><div><button type="submit" className="button outline" disabled={busy} value="draft">Save draft</button><button type="submit" className="button" disabled={busy||(mobileVerificationRequired&&!mobileVerified)} value="submit">{mobileVerificationRequired&&!mobileVerified?'Mobile verification required':'Submit for review'}</button></div></div>
  </fieldset>
  </SubmitForm>;
 }
 
-export function EnquiryTable({rows,vendors}:{rows:Enquiry[];vendors:Pick<Vendor,'id'|'name'>[]}){
- const router=useRouter();const[error,setError]=useState('');
- return <>{error&&<p role="alert" className="error">{error}</p>}{rows.length?<div className="table-wrap responsive-table"><table><thead><tr><th>Enquiry</th><th>Vendor</th><th>Event</th><th>Received</th><th>Status</th></tr></thead><tbody>{rows.map(e=><tr key={e.id}><td data-label="Enquiry"><strong>{e.name}</strong><small>{e.contact}</small><details><summary>View message</summary><p>{e.message}</p><small>Consent to share confirmed</small></details></td><td data-label="Vendor">{vendors.find(v=>v.id===e.vendorId)?.name}</td><td data-label="Event">{e.city}<small>{e.date}</small></td><td data-label="Received">{new Date(e.createdAt).toLocaleDateString('en-IN')}</td><td data-label="Status"><select aria-label={`Status for ${e.name}`} value={e.status} onChange={async x=>{try{await post('enquiry-status',{id:e.id,status:x.target.value});router.refresh();}catch(e){setError((e as Error).message);}}}>{['new','contacted','closed'].map(x=><option key={x}>{x}</option>)}</select></td></tr>)}</tbody></table></div>:<div className="empty-state"><h3>Your next conversation starts here.</h3><p>Received enquiries will appear in this space.</p></div>}</>;
-}
 export function AdminVendorForm({vendor:v}:{vendor:Vendor}){const router=useRouter();const[message,setMessage]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);return <SubmitForm onEdit={()=>setError('')} className="stack-form" onSubmit={async e=>{e.preventDefault();setBusy(true);setError('');try{const d=formData(e.currentTarget);const result=await post('admin/vendor',{...d,id:v.id,published:d.published==='on',featured:d.featured==='on'});setMessage(result.message);router.refresh();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}><div className="form-grid"><label className="field"><span>Review decision</span><select name="status" defaultValue={v.status}>{['draft','pending','approved','rejected','suspended','inactive'].map(s=><option key={s} value={s}>{reviewLabels[s as keyof typeof reviewLabels]}</option>)}</select></label><Field name="priority" label="Featured priority (lower first)" type="number" min={0} value={v.priority}/><Field name="featuredStart" label="Featured from (optional)" type="date" value={v.featuredStart} required={false}/><Field name="featuredEnd" label="Featured until (optional)" type="date" value={v.featuredEnd} required={false}/></div><label className="checkbox"><input name="published" type="checkbox" defaultChecked={v.published}/>Publish approved profile</label><label className="checkbox"><input name="featured" type="checkbox" defaultChecked={v.featured}/>Enable manual Featured placement</label><label className="field"><span>Decision / review remarks</span><textarea name="remarks" required minLength={3} maxLength={1000} rows={3} defaultValue={v.remarks}/></label>{message&&<p className="success" role="status">{message}</p>}{error&&<p className="error" role="alert">{error}</p>}<button disabled={busy} className="button">{busy?'Saving decision…':'Save decision & notify vendor'}</button></SubmitForm>;}
 export function AdminVendorDetailsForm({vendor:v,categories,locations}:{vendor:Vendor;categories:Taxon[];locations:Taxon[]}){
  const router=useRouter();
