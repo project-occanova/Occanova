@@ -40,6 +40,9 @@ export function syncSubscription(selected:VendorSubscription,remote:RazorpaySubs
  const used=['authenticated','active','pending','halted'].includes(remote.status)||remote.paid_count>0;
  return {...selected,status:remote.status as VendorSubscription['status'],paidCount:remote.paid_count,trialUsedAt:selected.trialUsedAt||(used?new Date(now).toISOString():undefined),updatedAt:new Date(now).toISOString()};
 }
+export class RazorpayRequestError extends Error{
+ constructor(public status:number){super(`Razorpay request failed (${status}).`);this.name='RazorpayRequestError';}
+}
 export async function razorpay<T>(method:'GET'|'POST',path:string,body?:unknown):Promise<T>{
  const key=process.env.RAZORPAY_KEY_ID,secret=process.env.RAZORPAY_KEY_SECRET;
  if(!key||!secret)throw Error('Razorpay credentials are not configured.');
@@ -47,8 +50,8 @@ export async function razorpay<T>(method:'GET'|'POST',path:string,body?:unknown)
   method,headers:{Authorization:`Basic ${Buffer.from(`${key}:${secret}`).toString('base64')}`,'Content-Type':'application/json'},
   body:body===undefined?undefined:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(10000),
  });
+ if(!response.ok)throw new RazorpayRequestError(response.status);
  const result=await response.json();
- if(!response.ok)throw Error(`Razorpay request failed (${response.status}): ${String(result?.error?.description||'Unknown error')}`);
  return result as T;
 }
 

@@ -1,6 +1,6 @@
+import type {CheckoutFailure} from './autopay-feedback';
 type CheckoutResponse={razorpay_payment_id:string;razorpay_subscription_id:string;razorpay_signature:string};
 export type OrderCheckoutResponse={razorpay_payment_id:string;razorpay_order_id:string;razorpay_signature:string};
-type CheckoutFailure={error?:{description?:string}};
 type CheckoutOptions<T>={key:string;subscription_id?:string;order_id?:string;amount?:number;currency?:string;name:string;description:string;prefill:{email:string;contact:string};theme:{color:string};modal:{ondismiss:()=>void};handler:(response:T)=>void};
 type CheckoutInstance={open:()=>void;on:(name:string,handler:(response:CheckoutFailure)=>void)=>void};
 declare global{interface Window{Razorpay?:new<T>(options:CheckoutOptions<T>)=>CheckoutInstance}}
@@ -17,11 +17,11 @@ async function load(){
  }).catch(error=>{loading=undefined;throw error;});
  await loading;
 }
-export async function openSubscriptionCheckout(input:{key:string;subscriptionId:string;email:string;phone:string;description:string;onConfirm:(response:CheckoutResponse)=>void;onClose:()=>void;onFailure:()=>void}){
+export async function openSubscriptionCheckout(input:{key:string;subscriptionId:string;email:string;phone:string;description:string;onConfirm:(response:CheckoutResponse)=>void;onClose:()=>void;onFailure:(response:CheckoutFailure)=>void}){
  await load();
  let confirming=false;
- const checkout=new window.Razorpay!({key:input.key,subscription_id:input.subscriptionId,name:'Occanova',description:input.description,prefill:{email:input.email,contact:input.phone},theme:{color:'#315b1c'},modal:{ondismiss:()=>{if(!confirming)input.onClose();}},handler:(response:CheckoutResponse)=>{confirming=true;input.onConfirm(response);}});
- checkout.on('payment.failed',input.onFailure);checkout.open();
+ const checkout=new window.Razorpay!({key:input.key,subscription_id:input.subscriptionId,name:'Occanova',description:input.description,prefill:{email:input.email,contact:input.phone},theme:{color:'#315b1c'},modal:{ondismiss:()=>{if(!confirming)input.onClose();}},handler:(response:CheckoutResponse)=>{if(confirming)return;confirming=true;input.onConfirm(response);}});
+ checkout.on('payment.failed',response=>{if(!confirming)input.onFailure(response);});checkout.open();
 }
 export async function openOrderCheckout(input:{key:string;orderId:string;amount:number;currency:string;email:string;phone:string;onConfirm:(response:OrderCheckoutResponse)=>void;onClose:()=>void;onFailure:(message:string)=>void}){
  await load();
