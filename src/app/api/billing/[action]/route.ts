@@ -3,7 +3,8 @@ import {z} from 'zod';
 import {currentUser} from '@/lib/auth';
 import {mutate} from '@/lib/store';
 import {rateLimited} from '@/lib/rate-limit';
-import {billingEnabled,isPlanId,knownStatus,razorpay,prepareSubscription,validSignature,type RazorpaySubscription} from '@/lib/subscriptions';
+import {billingEnabled,isPlanId,razorpay,syncSubscription,validSignature,type RazorpaySubscription} from '@/lib/subscriptions';
+import {setupSubscription} from '@/lib/subscription-setup';
 export const runtime='nodejs';
 const fail=(error:string,status=400)=>NextResponse.json({error},{status});
 
@@ -26,16 +27,15 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{action:stri
    if(!selected?.gatewayId)return fail('No subscription to check.',404);
    if(await rateLimited(`billing-status:${user.id}`,2,30000))return fail('Please wait a moment before checking again.',429);
    const remote=await razorpay<RazorpaySubscription>('GET',`subscriptions/${selected.gatewayId}`);
-   if(remote.id!==selected.gatewayId||remote.plan_id!==selected.gatewayPlanId||!knownStatus(remote.status))return fail('Subscription details do not match.',409);
-   await mutate(state=>{const account=state.users.find(item=>item.id===user.id);if(!account?.subscription||account.subscription.gatewayId!==remote.id)return;account.subscription.status=remote.status as typeof account.subscription.status;account.subscription.paidCount=remote.paid_count;account.subscription.updatedAt=new Date().toISOString();});
+   const updated=syncSubscription(selected,remote);
+   await mutate(state=>{const account=state.users.find(item=>item.id===user.id);if(!account?.subscription||account.subscription.gatewayId!==remote.id)throw Error('Billing changed. Refresh and try again.');account.subscription={...updated,trialUsedAt:account.subscription.trialUsedAt||updated.trialUsedAt};});
    return NextResponse.json({ok:true,status:remote.status});
   }
   if(action==='checkout'){
    const {plan}=z.object({plan:z.string()}).parse(body);
    if(!isPlanId(plan))return fail('Choose a valid plan.');
    if(await rateLimited(`billing-checkout:${user.id}`,1,30000))return fail('Please wait a moment before retrying.',429);
-   const prepared=await prepareSubscription(plan,user.subscription,{occanova_vendor_id:user.id,occanova_plan:plan});
-   await mutate(state=>{const account=state.users.find(item=>item.id===user.id);if(!account)throw Error('Vendor account missing.');if(account.subscription?.gatewayId!==user.subscription?.gatewayId)throw Error('Billing changed. Refresh and try again.');account.subscription=prepared;});
+   const prepared=await setupSubscription('vendor',user.id,plan,{occanova_vendor_id:user.id,occanova_plan:plan});
    return NextResponse.json({key:process.env.RAZORPAY_KEY_ID,subscriptionId:prepared.gatewayId,trialEndsAt:prepared.trialEndsAt});
   }
   if(action==='confirm'){
@@ -45,16 +45,18 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{action:stri
    if(!validSignature(`${paymentId}|${selected.gatewayId}`,signature,process.env.RAZORPAY_KEY_SECRET||''))return fail('Payment signature was invalid.',403);
    const remote=await razorpay<RazorpaySubscription>('GET',`subscriptions/${selected.gatewayId}`);
    if(remote.plan_id!==selected.gatewayPlanId||!['authenticated','active'].includes(remote.status))return fail('Razorpay has not confirmed the mandate yet.',409);
-   await mutate(state=>{const account=state.users.find(item=>item.id===user.id);if(!account?.subscription||account.subscription.gatewayId!==remote.id)return;account.subscription.status=remote.status as 'authenticated'|'active';account.subscription.trialUsedAt??=new Date().toISOString();account.subscription.paidCount=remote.paid_count;account.subscription.updatedAt=new Date().toISOString();});
+   const updated=syncSubscription(selected,remote);
+   await mutate(state=>{const account=state.users.find(item=>item.id===user.id);if(!account?.subscription||account.subscription.gatewayId!==remote.id)throw Error('Billing changed. Refresh and try again.');account.subscription={...updated,trialUsedAt:account.subscription.trialUsedAt||updated.trialUsedAt};});
    return NextResponse.json({ok:true,status:remote.status});
   }
   const selected=user.subscription;
   if(!selected?.gatewayId)return fail('No subscription to cancel.',404);
   if(await rateLimited(`billing-cancel:${user.id}`,2,60000))return fail('Please wait a moment before retrying.',429);
   const remote=await razorpay<RazorpaySubscription>('GET',`subscriptions/${selected.gatewayId}`);
-  if(remote.plan_id!==selected.gatewayPlanId)return fail('Subscription plan mismatch.',409);
+  const refreshed=syncSubscription(selected,remote);
   const cancelled=['cancelled','expired','completed'].includes(remote.status)?remote:await razorpay<RazorpaySubscription>('POST',`subscriptions/${selected.gatewayId}/cancel`,{cancel_at_cycle_end:false});
-  await mutate(state=>{const account=state.users.find(item=>item.id===user.id);if(!account?.subscription||account.subscription.gatewayId!==selected.gatewayId)return;account.subscription.status=knownStatus(cancelled.status)?cancelled.status as typeof account.subscription.status:'cancelled';account.subscription.updatedAt=new Date().toISOString();});
+  const updated=syncSubscription(refreshed,cancelled);
+  await mutate(state=>{const account=state.users.find(item=>item.id===user.id);if(!account?.subscription||account.subscription.gatewayId!==selected.gatewayId)throw Error('Billing changed. Refresh and try again.');account.subscription={...updated,trialUsedAt:account.subscription.trialUsedAt||updated.trialUsedAt};});
   return NextResponse.json({ok:true,status:cancelled.status});
  }catch(error){
   if(error instanceof z.ZodError)return fail('Check the subscription details.');

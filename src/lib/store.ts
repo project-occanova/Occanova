@@ -1,12 +1,13 @@
 import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import path from 'node:path';
+import {cache} from 'react';
 import type {ClientSession} from 'mongodb';
 import {mongo,mongoConfigured} from './db';
 import {initialState} from './seed';
 import {normalizeCategories,normalizeVendorTaxonomy} from './taxonomy';
 import type {State} from './types';
 
-const file=path.join(process.cwd(),'data','preview.json');
+const file=process.env.VERCEL!=='1'&&process.env.OCCANOVA_PREVIEW_FILE?path.resolve(process.env.OCCANOVA_PREVIEW_FILE):path.join(process.cwd(),'data','preview.json');
 const globals=globalThis as typeof globalThis&{occanovaQueue?:Promise<unknown>;occanovaSeed?:Promise<void>};
 type StateList=keyof State;
 type MongoDoc={_id:string;[key:string]:unknown};
@@ -112,10 +113,11 @@ async function ensureMongoSeed(){
   return globals.occanovaSeed;
 }
 
-export async function readState():Promise<State>{
+// Deduplicate reads within one server render; API requests and writes still read fresh state.
+export const readState=cache(async():Promise<State>=>{
   if(!mongoConfigured())return localRead();
   await ensureMongoSeed();return mongoRead();
-}
+});
 
 async function mongoMutate<T>(fn:(state:State)=>T|Promise<T>){
   await ensureMongoSeed();const {client,db}=await mongo();const session=client.startSession();

@@ -21,12 +21,18 @@ function client(){
   return globals.occanovaS3??=new S3Client({region:config.region,endpoint:config.endpoint||undefined,forcePathStyle:process.env.S3_FORCE_PATH_STYLE==='true',credentials:{accessKeyId:process.env.S3_ACCESS_KEY_ID!,secretAccessKey:process.env.S3_SECRET_ACCESS_KEY!}});
 }
 const extensions:Record<string,string>={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','application/pdf':'pdf'};
+export function validateUploadContent(type:string,body:Uint8Array){
+ const prefix=(bytes:number[])=>bytes.every((value,index)=>body[index]===value);
+ const valid=type==='image/jpeg'?prefix([255,216,255]):type==='image/png'?prefix([137,80,78,71,13,10,26,10]):type==='image/webp'?prefix([82,73,70,70])&&[87,69,66,80].every((value,index)=>body[index+8]===value):type==='application/pdf'?prefix([37,80,68,70,45]):false;
+ if(!valid)throw Error('Choose an allowed file whose contents match its JPG, PNG, WebP or PDF format.');
+}
 function uploadTarget(userId:string,kind:UploadKind,type:string,size:number){
   const policy=allowed[kind];if(!policy.types.includes(type as never)||size<1||size>policy.max)throw Error(`Choose an allowed ${kind} file within ${Math.floor(policy.max/1_000_000)} MB.`);
   const {bucket}=settings();const key=`vendors/${userId}/${kind}/${randomUUID()}.${extensions[type]}`;
   return {bucket,key,path:`/api/media?key=${encodeURIComponent(key)}`};
 }
 export async function storeUpload(userId:string,kind:UploadKind,type:string,size:number,body:Uint8Array){
+  validateUploadContent(type,body);
   const {bucket,key,path}=uploadTarget(userId,kind,type,size);
   await client().send(new PutObjectCommand({Bucket:bucket,Key:key,ContentType:type,ContentLength:size,Body:body}));
   return {key,path};

@@ -3,7 +3,7 @@ import {ArrowRight,CheckCircle2,Circle} from 'lucide-react';
 import {redirect} from 'next/navigation';
 import {currentUser} from '@/lib/auth';
 import {hasStorage,mobileOtpEnabled} from '@/lib/config';
-import {enquiryVendorNames} from '@/lib/directory';
+import {enquiryVendorNames,isPublicVendor} from '@/lib/directory';
 import {readState} from '@/lib/store';
 import {EnquiryTable,MobileVerification,PasswordForm,ProfileForm} from '@/components/forms';
 import {Workspace} from '@/components/workspace';
@@ -24,6 +24,7 @@ export default async function Dashboard(){
   const enquiries=s.enquiries.filter(x=>x.vendorId===v?.id);
   const access=planAccess(user.subscription);
   const photoLimit=portfolioLimit(user.subscription);
+  const publicListing=v?isPublicVendor(v,user):false;
   const completion=v?Math.round([v.name,v.owner,v.category,v.service,v.city,v.description,v.phone,v.whatsapp,v.email,v.image,v.gallery.length].filter(Boolean).length/11*100):0;
   const steps=[
     ['Business details',!!(v?.name&&v.owner&&v.category&&v.service)],
@@ -59,13 +60,13 @@ export default async function Dashboard(){
       <div><span>Review status</span><strong className="capitalize">{v?.status??'Draft'}</strong></div>
       <div><span>New enquiries</span><strong>{enquiries.filter(x=>x.status==='new').length}</strong></div>
       <div><span>Total enquiries</span><strong>{enquiries.length}</strong></div>
-      <div><span>Public listing</span><strong>{v?.published&&v.status==='approved'?'Published':'Not published'}</strong></div>
+      <div><span>Public listing</span><strong>{publicListing?'Published':'Not published'}</strong></div>
     </div>
 
     {v?.remarks&&<div className="notice workspace-notice"><strong>Occanova’s review:</strong> {v.remarks}</div>}
 
     <section id="profile" className="panel workspace-section">
-      <div className="workspace-section-heading"><div><h2>Business profile</h2><p>Keep your services, locations, media, and public information up to date.</p></div>{v?.published&&v.status==='approved'&&<Link href={'/vendors/'+v.slug}>View public profile</Link>}</div>
+      <div className="workspace-section-heading"><div><h2>Business profile</h2><p>Keep your services, locations, media, and public information up to date.</p></div>{publicListing&&v&&<Link href={'/vendors/'+v.slug}>View public profile</Link>}</div>
       <ProfileForm vendor={v} categories={s.categories} locations={s.locations} email={user.email} phone={user.phone} storageEnabled={hasStorage()} mobileVerified={Boolean(user.phoneVerified)} mobileVerificationRequired={mobileOtpEnabled()} portfolioLimit={photoLimit} editingEnabled={access.allowed} lockedReason={access.reason}/>
     </section>
 

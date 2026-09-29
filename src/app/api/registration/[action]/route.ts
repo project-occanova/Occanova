@@ -5,7 +5,8 @@ import {currentRegistration,finishRegistrationSession} from '@/lib/registration-
 import {activateRegistration} from '@/lib/registration';
 import {mutate} from '@/lib/store';
 import {rateLimited} from '@/lib/rate-limit';
-import {billingEnabled,isPlanId,prepareSubscription,razorpay,validSignature,type RazorpaySubscription} from '@/lib/subscriptions';
+import {billingEnabled,isPlanId,razorpay,validSignature,type RazorpaySubscription} from '@/lib/subscriptions';
+import {setupSubscription} from '@/lib/subscription-setup';
 export const runtime='nodejs';
 const fail=(error:string,status=400)=>NextResponse.json({error},{status});
 
@@ -29,8 +30,7 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{action:stri
     const remote=await razorpay<RazorpaySubscription>('GET',`subscriptions/${pending.subscription.gatewayId}`);
     if(['authenticated','active'].includes(remote.status)){const user=await mutate(state=>activateRegistration(state,pending.id,remote));await finishRegistrationSession(user.id);return NextResponse.json({ok:true,redirect:'/dashboard'});}
    }
-   const record=await prepareSubscription(input.plan,pending.subscription,{occanova_registration_id:pending.id,occanova_plan:input.plan});
-   await mutate(state=>{const row=state.registrations.find(item=>item.id===pending.id);if(!row||row.completedUserId)throw Error('Registration changed. Refresh this page.');row.plan=input.plan as typeof row.plan;row.subscription=record;row.autopayConsentAt=new Date().toISOString();});
+   const record=await setupSubscription('registration',pending.id,input.plan,{occanova_registration_id:pending.id,occanova_plan:input.plan});
    return NextResponse.json({key:process.env.RAZORPAY_KEY_ID,subscriptionId:record.gatewayId,trialEndsAt:record.trialEndsAt});
   }
   const selected=pending.subscription;

@@ -15,6 +15,7 @@ import {billingEnabled} from '@/lib/subscriptions';
 import {assertPlanAccess,assertPortfolioLimit,PlanAccessError} from '@/lib/plan-access';
 import {startRegistration} from '@/lib/registration';
 import {registrationCookie,registrationCookieOptions} from '@/lib/registration-session';
+import {issuePasswordReset,resetAccountPassword} from '@/lib/password-reset';
 export const runtime='nodejs';
 const fail=(message:string,status=400)=>NextResponse.json({error:message},{status});
 export async function GET(req:NextRequest,{params}:{params:Promise<{path:string[]}>}) {
@@ -27,6 +28,7 @@ export async function GET(req:NextRequest,{params}:{params:Promise<{path:string[
   const state=await readState();const referenced=new Set(state.vendors.flatMap(vendorStorageKeys));
   return NextResponse.json({ok:true,...await cleanupOrphanedUploads(referenced,new Date(Date.now()-24*60*60*1000))});
  }
+ if(!['media','vendors'].includes(route))return fail('Not found',404);
  const s=await readState();
  if(route==='media'){
   if(!hasStorage())return fail('Private file storage is not configured.',503);
@@ -97,7 +99,7 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
    const t=token();await mutate(s=>{s.sessions=s.sessions.filter(x=>x.expires>Date.now());s.sessions.push({hash:digest(t),userId:user.id,expires:Date.now()+7*86400000});});(await cookies()).set('occanova_session',t,cookieOptions);return NextResponse.json({ok:true,redirect:user.role==='admin'?'/admin':'/dashboard'});
   }
   if(route==='auth/logout'){const value=(await cookies()).get('occanova_session')?.value;await mutate(s=>{s.sessions=s.sessions.filter(x=>x.hash!==digest(value??''));});(await cookies()).delete('occanova_session');(await cookies()).delete(registrationCookie);return NextResponse.json({ok:true});}
-  if(route==='auth/forgot') {if(!hasEmail()&&!localPreview())return fail('Password reset email is not available yet. Please contact Occanova support.',503);const email=z.string().email().transform(x=>x.toLowerCase()).parse(b.email);const t=token();let found=false;await mutate(s=>{const user=s.users.find(u=>u.email===email);if(user){found=true;s.tokens=s.tokens.filter(x=>!(x.userId===user.id&&x.kind==='reset'));s.tokens.push({hash:digest(t),userId:user.id,kind:'reset',expires:Date.now()+1800000});}});if(found)await sendResetEmail(email,t);return NextResponse.json({ok:true,message:'If an account exists, a password reset link has been sent.',verificationUrl:found&&localPreview()?`/reset-password?token=${t}`:undefined});}
+  if(route==='auth/forgot') {if(!hasEmail()&&!localPreview())return fail('Password reset email is not available yet. Please contact Occanova support.',503);const email=z.string().email().transform(x=>x.toLowerCase()).parse(b.email);const t=token();const found=await mutate(s=>issuePasswordReset(s,email,digest(t)));if(found)await sendResetEmail(email,t);return NextResponse.json({ok:true,message:'If an account or registration exists, a password reset link has been sent.',verificationUrl:found&&localPreview()?`/reset-password?token=${t}`:undefined});}
   if(route==='auth/resend') {
    if(!hasEmail()&&!localPreview())return fail('Verification email is temporarily unavailable.',503);
    const email=z.string().email().transform(x=>x.toLowerCase()).parse(b.email);const t=token();let found=false;
@@ -107,7 +109,7 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
    if(found)await sendVerificationEmail(email,t);
    return NextResponse.json({ok:true,message:'If an unverified registration exists, a new verification link has been sent.',verificationUrl:found&&localPreview()?`/verify?token=${t}`:undefined});
   }
-  if(route==='auth/reset'){const v=z.object({token:z.string().length(64),password:z.string().min(10).max(128)}).parse(b);await mutate(s=>{const t=s.tokens.find(x=>x.hash===digest(v.token)&&x.kind==='reset'&&x.expires>Date.now());if(!t)throw Error('This reset link is invalid or expired.');s.users.find(u=>u.id===t.userId)!.passwordHash=hashPassword(v.password);s.sessions=s.sessions.filter(x=>x.userId!==t.userId);s.tokens=s.tokens.filter(x=>x!==t);});return NextResponse.json({ok:true});}
+  if(route==='auth/reset'){const v=z.object({token:z.string().length(64),password:z.string().min(10).max(128)}).parse(b);await mutate(s=>resetAccountPassword(s,digest(v.token),hashPassword(v.password)));return NextResponse.json({ok:true});}
   if(route==='enquiries') {const v=enquirySchema.parse(b);const saved=await mutate(s=>{const vendor=publicVendors(s.vendors,{},s.users).find(x=>x.id===v.vendorId&&!x.sample);if(!vendor)throw Error('This vendor is unavailable.');const {website,...data}=v;void website;const enquiry={...data,id:randomUUID(),status:'new' as const,createdAt:new Date().toISOString()};s.enquiries.push(enquiry);return {enquiry,vendor};});let delivered=true;try{await sendEnquiryNotifications(saved.enquiry,saved.vendor);}catch{delivered=false;}return NextResponse.json({ok:true,id:saved.enquiry.id,message:localPreview()?'Enquiry saved in this local preview. No notification was sent.':delivered?'Your enquiry has been sent to the vendor.':'Your enquiry was saved. The email notification is delayed.'});}
   const user=await currentUser();if(!user)return fail('Please sign in.',401);
   if(route==='auth/mobile/send'){

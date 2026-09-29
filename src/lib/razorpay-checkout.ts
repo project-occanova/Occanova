@@ -19,7 +19,8 @@ async function load(){
 }
 export async function openSubscriptionCheckout(input:{key:string;subscriptionId:string;email:string;phone:string;description:string;onConfirm:(response:CheckoutResponse)=>void;onClose:()=>void;onFailure:()=>void}){
  await load();
- const checkout=new window.Razorpay!({key:input.key,subscription_id:input.subscriptionId,name:'Occanova',description:input.description,prefill:{email:input.email,contact:input.phone},theme:{color:'#315b1c'},modal:{ondismiss:input.onClose},handler:input.onConfirm});
+ let confirming=false;
+ const checkout=new window.Razorpay!({key:input.key,subscription_id:input.subscriptionId,name:'Occanova',description:input.description,prefill:{email:input.email,contact:input.phone},theme:{color:'#315b1c'},modal:{ondismiss:()=>{if(!confirming)input.onClose();}},handler:(response:CheckoutResponse)=>{confirming=true;input.onConfirm(response);}});
  checkout.on('payment.failed',input.onFailure);checkout.open();
 }
 export async function openOrderCheckout(input:{key:string;orderId:string;amount:number;currency:string;email:string;phone:string;onConfirm:(response:OrderCheckoutResponse)=>void;onClose:()=>void;onFailure:(message:string)=>void}){

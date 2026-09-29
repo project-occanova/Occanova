@@ -7,7 +7,7 @@ const esc=(value:string)=>value.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','
 async function send(to:string|string[],subject:string,html:string,text:string){
   const apiKey=process.env.RESEND_API_KEY,from=process.env.EMAIL_FROM;
   if(!apiKey||!from){if(localPreview())return;throw Error('Email delivery is not configured.');}
-  const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({from,to:Array.isArray(to)?to:[to],subject,html,text})});
+  const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({from,to:Array.isArray(to)?to:[to],subject,html,text}),signal:AbortSignal.timeout(10000)});
   if(!response.ok){const detail=await response.text();console.error('Resend delivery failed',response.status,detail.slice(0,300));throw Error('We could not send the email. Please try again.');}
 }
 
@@ -16,7 +16,7 @@ export const sendResetEmail=(email:string,value:string)=>send(email,'Reset your 
 export function sendFirstChargeReminder(email:string,plan:PlanId,date:string){
  const amount=subscriptionPlans[plan].monthlyRupees;
  const day=new Date(date).toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric',timeZone:'Asia/Kolkata'});
- return send(email,'Your Occanova free trial ends soon',`<h1>Your first subscription payment is approaching</h1><p>Your ${subscriptionPlans[plan].name} plan is scheduled to begin on ${esc(day)} at ₹${amount} per month. Check your Razorpay mandate for the final amount and taxes.</p><p>Manage or cancel AutoPay in your <a href="${siteUrl()}/dashboard#subscription">vendor studio</a> before the scheduled debit.</p>`,`Your Occanova ${subscriptionPlans[plan].name} free trial ends on ${day}. The plan is ₹${amount} per month. Check your Razorpay mandate for the final amount and taxes. Manage or cancel AutoPay: ${siteUrl()}/dashboard#subscription`);
+ return send(email,'Your Occanova free trial ends soon',`<h1>Your first subscription payment is approaching</h1><p>Your ${subscriptionPlans[plan].name} plan is scheduled to begin on ${esc(day)} at ₹${amount} per month, including GST. Confirm the scheduled debit in your Razorpay mandate.</p><p>Manage or cancel AutoPay in your <a href="${siteUrl()}/dashboard#subscription">vendor studio</a> before the scheduled debit.</p>`,`Your Occanova ${subscriptionPlans[plan].name} free trial ends on ${day}. The plan is ₹${amount} per month, including GST. Confirm the scheduled debit in your Razorpay mandate. Manage or cancel AutoPay: ${siteUrl()}/dashboard#subscription`);
 }
 export async function sendEnquiryNotifications(enquiry:Enquiry,vendor:Vendor){
   const rows=`<p><strong>From:</strong> ${esc(enquiry.name)} (${esc(enquiry.contact)})</p><p><strong>Event:</strong> ${esc(enquiry.service)} in ${esc(enquiry.city)} on ${esc(enquiry.date)}</p><p>${esc(enquiry.message)}</p>`;

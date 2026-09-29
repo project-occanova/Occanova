@@ -31,6 +31,11 @@ export function validSignature(body:string,signature:string,secret:string){
 
 export type RazorpaySubscription={id:string;plan_id:string;status:string;start_at:number|null;paid_count:number;quantity:number;total_count:number;expire_by?:number;notes?:Record<string,string>};
 export function knownStatus(value:string){return ['created','authenticated','active','pending','halted','cancelled','completed','expired'].includes(value);}
+export function syncSubscription(selected:VendorSubscription,remote:RazorpaySubscription,now=Date.now()):VendorSubscription{
+ if(remote.id!==selected.gatewayId||remote.plan_id!==selected.gatewayPlanId||!knownStatus(remote.status)||remote.quantity!==1||remote.total_count!==96||!selected.trialEndsAt||remote.start_at!==Math.floor(Date.parse(selected.trialEndsAt)/1000))throw Error('Subscription details do not match the authorized plan and billing schedule.');
+ const used=['authenticated','active','pending','halted'].includes(remote.status)||remote.paid_count>0;
+ return {...selected,status:remote.status as VendorSubscription['status'],paidCount:remote.paid_count,trialUsedAt:selected.trialUsedAt||(used?new Date(now).toISOString():undefined),updatedAt:new Date(now).toISOString()};
+}
 export async function razorpay<T>(method:'GET'|'POST',path:string,body?:unknown):Promise<T>{
  const key=process.env.RAZORPAY_KEY_ID,secret=process.env.RAZORPAY_KEY_SECRET;
  if(!key||!secret)throw Error('Razorpay credentials are not configured.');
@@ -57,8 +62,9 @@ export async function prepareSubscription(plan:PlanId,existing:VendorSubscriptio
  const gatewayPlan=await razorpay<{id:string;period:string;interval:number;item:{amount:number;currency:string}}>('GET',`plans/${planId}`);
  if(gatewayPlan.id!==planId||gatewayPlan.period!=='monthly'||gatewayPlan.interval!==1||gatewayPlan.item?.amount!==subscriptionPlans[plan].monthlyRupees*100||gatewayPlan.item?.currency!=='INR')throw Error('The Razorpay plan does not match the agreed price.');
  const now=new Date();
- const firstCharge=existing?.trialUsedAt?(existing.trialEndsAt&&Date.parse(existing.trialEndsAt)>now.getTime()+600000?new Date(existing.trialEndsAt):new Date(now.getTime()+600000)):trialEnd(now);
+ const trialUsedAt=existing?.trialUsedAt||(['authenticated','active','pending','halted'].includes(existing?.status||'')||Number(existing?.paidCount)>0?now.toISOString():undefined);
+ const firstCharge=trialUsedAt?(existing?.trialEndsAt&&Date.parse(existing.trialEndsAt)>now.getTime()+600000?new Date(existing.trialEndsAt):new Date(now.getTime()+600000)):trialEnd(now);
  const created=await razorpay<RazorpaySubscription>('POST','subscriptions',{plan_id:planId,total_count:96,quantity:1,customer_notify:process.env.NODE_ENV==='production',start_at:Math.floor(firstCharge.getTime()/1000),expire_by:Math.floor(now.getTime()/1000)+1800,notes});
  if(!/^sub_[A-Za-z0-9]+$/.test(created.id)||created.plan_id!==planId||created.status!=='created'||created.start_at!==Math.floor(firstCharge.getTime()/1000))throw Error('Razorpay returned an unexpected subscription.');
- return {plan,status:'created',gatewayId:created.id,gatewayPlanId:planId,trialEndsAt:new Date(created.start_at*1000).toISOString(),trialUsedAt:existing?.trialUsedAt,paidCount:0,updatedAt:now.toISOString()} satisfies VendorSubscription;
+ return {plan,status:'created',gatewayId:created.id,gatewayPlanId:planId,trialEndsAt:new Date(created.start_at*1000).toISOString(),trialUsedAt,paidCount:0,updatedAt:now.toISOString()} satisfies VendorSubscription;
 }

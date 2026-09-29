@@ -6,12 +6,12 @@ import {
   CreditCard,
   Layers,
   Mail,
-  Menu,
   Settings2,
   Store,
   type LucideIcon,
 } from 'lucide-react';
 import {Logout} from './forms';
+import {WorkspaceMenu} from './workspace-menu';
 
 type WorkspaceItem={href:string;label:string;icon:LucideIcon};
 
@@ -47,10 +47,7 @@ export function Workspace({admin=false,children,email}:{admin?:boolean;children:
       <header className="workspace-header"><span>{admin?'Occanova administration':'Manage your business'}</span><span>{email}</span></header>
       <header className="workspace-mobile-header">
         <Link href={base} className="workspace-mobile-brand">OCCANOVA<small>{admin?'ADMIN STUDIO':'VENDOR STUDIO'}</small></Link>
-        <details className="workspace-more">
-          <summary aria-label="Open workspace navigation"><Menu size={22} aria-hidden="true"/></summary>
-          <div><nav aria-label="Mobile workspace navigation"><WorkspaceLinks items={[...primary,...manage]}/></nav><Link className="workspace-visit" href="/">Visit website<ArrowUpRight size={15}/></Link><Logout redirectTo={admin?'/admin/login':'/login'}/></div>
-        </details>
+        <WorkspaceMenu><nav aria-label="Mobile workspace navigation"><WorkspaceLinks items={[...primary,...manage]}/></nav><Link className="workspace-visit" href="/">Visit website<ArrowUpRight size={15}/></Link><Logout redirectTo={admin?'/admin/login':'/login'}/></WorkspaceMenu>
       </header>
       <main id="main" className="workspace-main">{children}</main>
       <nav className="workspace-mobile-nav" aria-label="Primary workspace navigation"><WorkspaceLinks items={mobile} markFirst/></nav>

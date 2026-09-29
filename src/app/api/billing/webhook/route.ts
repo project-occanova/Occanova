@@ -1,7 +1,7 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {mutate,readState} from '@/lib/store';
 import {activateRegistration} from '@/lib/registration';
-import {billingConfigured,knownStatus,razorpay,validSignature,type RazorpaySubscription} from '@/lib/subscriptions';
+import {billingConfigured,knownStatus,razorpay,syncSubscription,validSignature,type RazorpaySubscription} from '@/lib/subscriptions';
 export const runtime='nodejs';
 export async function POST(req:NextRequest){
  const secret=process.env.RAZORPAY_WEBHOOK_SECRET;
@@ -30,8 +30,7 @@ export async function POST(req:NextRequest){
    }
    const account=current.users.find(user=>user.id===owner?.id);
    if(!account?.subscription||account.subscription.gatewayId!==id)return;
-   account.subscription.status=remote.status as typeof account.subscription.status;account.subscription.paidCount=remote.paid_count;account.subscription.updatedAt=new Date().toISOString();
-   if(['authenticated','active','pending','halted'].includes(remote.status))account.subscription.trialUsedAt??=new Date().toISOString();
+   account.subscription=syncSubscription(account.subscription,remote);
   });
   return NextResponse.json({ok:true});
  }catch(error){console.error('Subscription webhook failed',error);return NextResponse.json({error:'Webhook processing failed'},{status:502});}
