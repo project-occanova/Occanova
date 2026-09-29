@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {initialState} from '../src/lib/seed';
 import {startRegistration} from '../src/lib/registration';
-import {issueEmailVerification,registrationRecoveryExpiry,revokeEmailVerification,verifyEmail} from '../src/lib/email-verification';
+import {emailVerificationStatus,issueEmailVerification,recordVerificationEmail,registrationRecoveryExpiry,revokeEmailVerification,verificationRecoveryMessage,verifyEmail} from '../src/lib/email-verification';
 
 const now=Date.parse('2026-09-29T10:00:00Z'),day=86400000;
 function fixture(){
@@ -95,4 +95,32 @@ test('delivery failure rollback cannot delete a link consumed during delivery',(
  const {state,pending}=fixture();issueEmailVerification(state,pending.email,'delivered',now+1000);
  verifyEmail(state,'delivered','session',undefined,now+2000);revokeEmailVerification(state,'delivered');
  assert.equal(verifyEmail(state,'delivered','attacker',undefined,now+3000).alreadyVerified,true);
+});
+test('recovery distinguishes verified, unverified, missing and expired registrations without changing them',()=>{
+ const {state,pending}=fixture();const before=JSON.stringify(state);
+ assert.equal(emailVerificationStatus(state,' VERIFY@example.com ',now),'unverified');
+ assert.equal(emailVerificationStatus(state,'unknown@example.com',now),'not_found');
+ assert.equal(emailVerificationStatus(state,pending.email,now+31*day),'registration_expired');
+ assert.equal(JSON.stringify(state),before);
+ pending.verified=true;assert.equal(emailVerificationStatus(state,pending.email,now),'already_verified');
+ assert.match(verificationRecoveryMessage('already_verified'),/already verified.*log in/);
+ assert.match(verificationRecoveryMessage('not_found'),/No account/);assert.match(verificationRecoveryMessage('registration_expired'),/register again/);
+});
+test('activated accounts take precedence over stale pending records and issue no resend token',()=>{
+ const {state,pending}=fixture();state.users.push({id:pending.id,email:pending.email,phone:pending.phone,passwordHash:'hash',role:'vendor',verified:true});
+ assert.equal(emailVerificationStatus(state,pending.email,now),'already_verified');
+ assert.equal(issueEmailVerification(state,pending.email,'unused',now),false);assert.equal(state.tokens.length,0);
+});
+test('legacy email casing is normalized consistently for status, token issuance and tracking',()=>{
+ const {state,pending}=fixture();pending.email='Verify@Example.com';
+ assert.equal(emailVerificationStatus(state,'verify@example.com',now),'unverified');assert.equal(issueEmailVerification(state,'verify@example.com','resent',now),true);
+ recordVerificationEmail(state,'verify@example.com',{status:'accepted',attemptedAt:new Date(now).toISOString(),providerId:'ref'});
+ assert.equal(pending.verificationEmail?.providerId,'ref');assert.equal(verifyEmail(state,'resent','session',undefined,now+1000).issueSession,true);
+});
+test('verification email references are private tracking data; a late failure cannot overwrite a newer acceptance',()=>{
+ const {state,pending}=fixture();const accepted={status:'accepted' as const,attemptedAt:new Date(now+2000).toISOString(),providerId:'email-reference'};
+ recordVerificationEmail(state,pending.email,accepted);
+ recordVerificationEmail(state,pending.email,{status:'failed',attemptedAt:new Date(now+1000).toISOString()});
+ assert.deepEqual(pending.verificationEmail,accepted);assert.equal(pending.verified,false);assert.equal(state.users.length,0);assert.equal(pending.sessionHash,undefined);
+ recordVerificationEmail(state,pending.email,{status:'failed',attemptedAt:new Date(now+3000).toISOString()});assert.equal(pending.verificationEmail?.status,'failed');assert.equal(pending.verificationEmail?.providerId,undefined);
 });

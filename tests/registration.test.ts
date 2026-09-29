@@ -24,8 +24,8 @@ test('gateway ownership, plan, debit schedule and cycle count are checked before
  for(const change of [{id:'sub_other'},{plan_id:'plan_other'},{start_at:0},{start_at:now/1000},{quantity:2},{total_count:1},{notes:{occanova_registration_id:'other'}}]){const {state,pending,remote}=fixture();assert.throws(()=>activateRegistration(state,pending.id,{...remote,...change},now));assert.equal(state.users.length,0);}
 });
 test('authenticated mandate activates once even when callback and webhook repeat',()=>{
- const {state,pending,remote}=fixture();const first=activateRegistration(state,pending.id,remote,now);const second=activateRegistration(state,pending.id,{...remote,status:'active'},now+1000);
- assert.equal(first.id,second.id);assert.equal(state.users.length,1);assert.equal(first.subscription?.trialUsedAt,new Date(now).toISOString());assert.equal(first.role,'vendor');assert.equal(first.verified,true);assert.equal(state.sessions.length,0);
+ const {state,pending,remote}=fixture();pending.verificationEmail={status:'accepted',attemptedAt:new Date(now).toISOString(),providerId:'verification-reference'};const first=activateRegistration(state,pending.id,remote,now);const second=activateRegistration(state,pending.id,{...remote,status:'active'},now+1000);
+ assert.equal(first.id,second.id);assert.equal(state.users.length,1);assert.equal(first.subscription?.trialUsedAt,new Date(now).toISOString());assert.equal(first.role,'vendor');assert.equal(first.verified,true);assert.equal(state.sessions.length,0);assert.deepEqual(first.verificationEmail,pending.verificationEmail);
 });
 test('duplicate email or phone cannot produce another registration or active account',()=>{
  for(const identity of ['email','phone'] as const){const {state,pending,remote}=fixture();assert.throws(()=>startRegistration(state,{...input,[identity]:pending[identity]},now),/already in progress/);

@@ -20,7 +20,7 @@ import {validationFeedback} from '@/lib/form-feedback';
 import {notifyVendor,reviewNotificationKind,markNotificationsRead} from '@/lib/vendor-notifications';
 import {deliverReviewNotification} from '@/lib/review-delivery';
 import {workspaceVersion} from '@/lib/workspace-version';
-import {issueEmailVerification,revokeEmailVerification,verifyEmail} from '@/lib/email-verification';
+import {emailVerificationStatus,issueEmailVerification,recordVerificationEmail,revokeEmailVerification,verificationRecoveryMessage,verifyEmail} from '@/lib/email-verification';
 export const runtime='nodejs';
 const fail=(message:string,status=400)=>NextResponse.json({error:message},{status});
 export async function GET(req:NextRequest,{params}:{params:Promise<{path:string[]}>}) {
@@ -67,7 +67,7 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
   const raw=await req.text();if(raw.length>16000)return fail('Request too large',413);
   const b=JSON.parse(raw||'{}');
   // Sharing a recipient budget across public email actions prevents resend/reset spam.
-  if(['auth/resend','auth/forgot'].includes(route)){
+  if(route==='auth/forgot'){
    const email=z.string().trim().email().max(160).transform(value=>value.toLowerCase()).parse(b.email);
    if(await rateLimited(`account-email:${digest(email)}`,3,15*60*1000))return fail('Too many email requests for this address. Please wait 15 minutes and check your inbox or spam folder.',429);
   }
@@ -80,7 +80,7 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
     if(s.users.some(u=>u.email===v.email||normalizeIndianMobile(u.phone)===v.phone))throw Error('An account already uses this email or phone.');
     const id=randomUUID();s.users.push({id,email:v.email,phone:v.phone,passwordHash:hashPassword(v.password),role:'vendor',verified:false,phoneVerified:false});s.tokens.push({hash:digest(t),userId:id,kind:'verify',expires:Date.now()+86400000});return id;
    });
-   let delivered=false;if(hasEmail()){try{await sendVerificationEmail(v.email,t);delivered=true;}catch{/* Verification can be resumed through resend. */}}
+   let delivered=false;if(hasEmail()){const attemptedAt=new Date().toISOString();let providerId:string|undefined;try{providerId=await sendVerificationEmail(v.email,t);delivered=true;}catch{/* Registration remains recoverable through resend. */}try{await mutate(s=>recordVerificationEmail(s,v.email,{status:delivered?'accepted':'failed',attemptedAt,providerId}));}catch{console.error('Verification email tracking could not be saved.');}}
    const directVerification=localPreview()||!hasEmail();
    return NextResponse.json({ok:true,id,email:v.email,emailDelivery:directVerification?'preview':delivered?'sent':'delayed',message:paid?(directVerification?'Registration saved. Verify your email, then authorize AutoPay to activate your vendor account.':delivered?'Registration saved. Open the verification email, then authorize AutoPay to activate your account.':'Registration saved, but we could not send the verification email. Request a new link below; your account remains inactive.'):directVerification?'Account created. Use the secure verification link below to activate it.':delivered?'Account created. Check your email to verify your address.':'Account created, but email delivery was delayed. Request a new verification link.',verificationUrl:directVerification?`/verify?token=${t}`:undefined});
   }
@@ -112,15 +112,22 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
   }
   if(route==='auth/logout'){const value=(await cookies()).get('occanova_session')?.value;await mutate(s=>{s.sessions=s.sessions.filter(x=>x.hash!==digest(value??''));});(await cookies()).delete('occanova_session');(await cookies()).delete(registrationCookie);return NextResponse.json({ok:true});}
   if(route==='auth/forgot') {if(!hasEmail()&&!localPreview())return fail('Password reset email is not available yet. Please contact Occanova support.',503);const email=z.string().trim().email().max(160).transform(x=>x.toLowerCase()).parse(b.email);const t=token();const found=await mutate(s=>issuePasswordReset(s,email,digest(t)));if(found)await sendResetEmail(email,t);return NextResponse.json({ok:true,message:'If an account or registration exists, a password reset link has been sent.',verificationUrl:found&&localPreview()?`/reset-password?token=${t}`:undefined});}
-  if(route==='auth/resend') {
-   if(!hasEmail()&&!localPreview())return fail('Verification email is temporarily unavailable.',503);
+  if(route==='auth/resend'||route==='auth/verification-status') {
    const email=z.string().trim().email().max(160).transform(x=>x.toLowerCase()).parse(b.email);const t=token();const hash=digest(t);
-   const found=await mutate(s=>issueEmailVerification(s,email,hash));
-   if(found){try{await sendVerificationEmail(email,t);}catch{
-    await mutate(s=>revokeEmailVerification(s,hash));
+   const status= emailVerificationStatus(await readState(),email);
+   if(route==='auth/verification-status')return NextResponse.json({ok:true,status,message:status==='unverified'?'Your email is not verified yet. Request a verification link to continue.':verificationRecoveryMessage(status)});
+   if(status!=='unverified')return NextResponse.json({ok:true,status,message:verificationRecoveryMessage(status)});
+   if(!hasEmail()&&!localPreview())return fail('Verification email is temporarily unavailable. Please try again later or contact info@occanova.com.',503);
+   if(await rateLimited(`account-email:${digest(email)}`,3,15*60*1000))return fail('Too many email requests for this address. Please wait 15 minutes and check your inbox or spam folder.',429);
+   const outcome=await mutate(s=>{const now=Date.now();const current=emailVerificationStatus(s,email,now);if(current==='unverified')issueEmailVerification(s,email,hash,now);return current;});
+   if(outcome!=='unverified')return NextResponse.json({ok:true,status:outcome,message:verificationRecoveryMessage(outcome)});
+   const attemptedAt=new Date().toISOString();let providerId:string|undefined;
+   try{providerId=await sendVerificationEmail(email,t);}catch{
+    await mutate(s=>{revokeEmailVerification(s,hash);recordVerificationEmail(s,email,{status:'failed',attemptedAt});});
     return fail('We could not send the verification email. Any earlier unexpired link still works. Please try again later or contact info@occanova.com.',503);
-   }}
-   return NextResponse.json({ok:true,message:'If your registration still needs verification, a new link has been sent. Check your inbox and spam folder. Already verified? Log in to continue. If registration was started over 30 days ago, register again.',verificationUrl:found&&localPreview()?`/verify?token=${t}`:undefined});
+   }
+   try{await mutate(s=>recordVerificationEmail(s,email,{status:'accepted',attemptedAt,providerId}));}catch{console.error('Verification email tracking could not be saved.');}
+   return NextResponse.json({ok:true,status:hasEmail()?'sent':'preview',message:hasEmail()?`A new verification email has been sent to ${email}. Check your inbox and spam folder. Allow a few minutes for delivery; if it does not arrive, contact info@occanova.com.`:'A verification link is ready in this local preview. No email was sent.',verificationUrl:localPreview()?`/verify?token=${t}`:undefined});
   }
   if(route==='auth/reset'){const v=z.object({token:z.string().length(64),password:z.string().min(10).max(128)}).parse(b);await mutate(s=>resetAccountPassword(s,digest(v.token),hashPassword(v.password)));return NextResponse.json({ok:true});}
   if(route==='enquiries') {const v=enquirySchema.parse(b);const saved=await mutate(s=>{const vendor=publicVendors(s.vendors,{},s.users).find(x=>x.id===v.vendorId&&!x.sample);if(!vendor)throw Error('This vendor is unavailable.');const {website,...data}=v;void website;const enquiry={...data,id:randomUUID(),status:'new' as const,createdAt:new Date().toISOString()};s.enquiries.push(enquiry);return {enquiry,vendor};});let delivered=true;try{await sendEnquiryNotifications(saved.enquiry,saved.vendor);}catch{delivered=false;}return NextResponse.json({ok:true,id:saved.enquiry.id,message:localPreview()?'Enquiry saved in this local preview. No notification was sent.':delivered?'Your enquiry has been sent to the vendor.':'Your enquiry was saved. The email notification is delayed.'});}

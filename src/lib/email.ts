@@ -9,6 +9,9 @@ async function send(to:string|string[],subject:string,html:string,text:string,id
   if(!apiKey||!from){if(localPreview())return;throw Error('Email delivery is not configured.');}
   const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json',...(idempotencyKey?{'Idempotency-Key':idempotencyKey}:{})},body:JSON.stringify({from,to:Array.isArray(to)?to:[to],subject,html,text}),signal:AbortSignal.timeout(10000)});
   if(!response.ok){const detail=await response.text();console.error('Resend delivery failed',response.status,detail.slice(0,300));throw Error('We could not send the email. Please try again.');}
+  const result=await response.json();
+  if(typeof result.id!=='string'||!result.id)throw Error('Email delivery could not be confirmed. Please try again.');
+  return result.id as string;
 }
 
 export function sendVendorUpdateEmail(email:string,notice:VendorNotification){

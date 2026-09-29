@@ -29,7 +29,7 @@ export function activateRegistration(state:State,id:string,remote:RazorpaySubscr
  const existing=state.users.find(user=>user.id===pending.completedUserId);
  if(existing)return existing;
  if(state.users.some(user=>sameIdentity(user,pending)))throw Error('An account already uses this email or phone.');
- const user:User={id:pending.id,email:pending.email,phone:pending.phone,passwordHash:pending.passwordHash,role:'vendor',verified:true,phoneVerified:false,subscription:{...selected,status:remote.status as 'authenticated'|'active',trialUsedAt:new Date(now).toISOString(),paidCount:remote.paid_count,updatedAt:new Date(now).toISOString()}};
+ const user:User={id:pending.id,email:pending.email,phone:pending.phone,passwordHash:pending.passwordHash,role:'vendor',verified:true,verificationEmail:pending.verificationEmail,phoneVerified:false,subscription:{...selected,status:remote.status as 'authenticated'|'active',trialUsedAt:new Date(now).toISOString(),paidCount:remote.paid_count,updatedAt:new Date(now).toISOString()}};
  state.users.push(user);pending.completedUserId=user.id;
  return user;
 }

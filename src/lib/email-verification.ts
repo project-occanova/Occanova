@@ -1,14 +1,38 @@
-import type {PendingRegistration,State} from './types';
+import type {PendingRegistration,State,VerificationEmail} from './types';
 
 const day=86400000;
 export function registrationRecoveryExpiry(row:PendingRegistration){
  return row.recoveryExpires??row.expires+30*day;
 }
 
+export type EmailVerificationStatus='unverified'|'already_verified'|'not_found'|'registration_expired';
+export function emailVerificationStatus(state:State,email:string,now=Date.now()):EmailVerificationStatus{
+ const address=email.trim().toLowerCase();
+ const user=state.users.find(row=>row.email.trim().toLowerCase()===address);
+ if(user)return user.verified?'already_verified':'unverified';
+ const pending=state.registrations.find(row=>row.email.trim().toLowerCase()===address&&!row.completedUserId);
+ if(!pending)return 'not_found';
+ if(pending.verified)return 'already_verified';
+ return registrationRecoveryExpiry(pending)>now?'unverified':'registration_expired';
+}
+
+export function verificationRecoveryMessage(status:Exclude<EmailVerificationStatus,'unverified'>){
+ return {already_verified:'Your email is already verified. You can log in now. If AutoPay setup is unfinished, logging in will let you complete it.',not_found:'No account or unfinished registration was found for this email address. Check the spelling and use the email you registered with. If an earlier registration expired, start a new registration.',registration_expired:'Your unfinished registration has expired. Please register again to receive a new verification email.'}[status];
+}
+
+export function recordVerificationEmail(state:State,email:string,delivery:VerificationEmail){
+ const address=email.trim().toLowerCase();
+ const user=state.users.find(row=>row.email.trim().toLowerCase()===address);
+ const pending=state.registrations.find(row=>row.email.trim().toLowerCase()===address&&!row.completedUserId);
+ for(const subject of [user,pending])if(subject&&(!subject.verificationEmail||subject.verificationEmail.attemptedAt<=delivery.attemptedAt))subject.verificationEmail=delivery;
+}
+
 // Resending adds a separately expiring link; it never cancels a delivered link.
 export function issueEmailVerification(state:State,email:string,hash:string,now=Date.now()){
- const user=state.users.find(row=>row.email===email&&!row.verified);
- const pending=state.registrations.find(row=>row.email===email&&!row.verified&&!row.completedUserId&&registrationRecoveryExpiry(row)>now);
+ if(emailVerificationStatus(state,email,now)!=='unverified')return false;
+ const address=email.trim().toLowerCase();
+ const user=state.users.find(row=>row.email.trim().toLowerCase()===address&&!row.verified);
+ const pending=state.registrations.find(row=>row.email.trim().toLowerCase()===address&&!row.verified&&!row.completedUserId&&registrationRecoveryExpiry(row)>now);
  const subject=user||pending;if(!subject)return false;
  state.tokens=state.tokens.filter(row=>row.expires>now);
  state.tokens.push({hash,userId:subject.id,kind:'verify',expires:now+day});
