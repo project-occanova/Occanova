@@ -1,6 +1,6 @@
 # Vendor subscription rollout
 
-The subscription code ships behind `SUBSCRIPTIONS_ENABLED=true`. Keep that flag off until the chosen gateway mode has validated credentials, plans and a public webhook. The owner has selected Live Mode for production; local Test Mode credentials must never be copied there. With the flag off, existing production registration and listings keep their current behavior. Full mandate authorization and provider webhook delivery remain unverified.
+The subscription code ships behind `SUBSCRIPTIONS_ENABLED=true`. Keep that flag off until the chosen gateway mode has validated credentials, plans and a public webhook. The owner has selected Live Mode for production; local Test Mode credentials must never be copied there. With the flag off, new production registrations are unavailable; existing accounts keep their current behavior. Full mandate authorization and provider webhook delivery remain unverified.
 
 ## Plans from the supplied PDF
 
@@ -52,7 +52,7 @@ Razorpay Test Mode credentials are saved only in ignored `.env.local`. All four 
 
 ## Mandatory registration setup
 
-Use `SUBSCRIPTIONS_ENABLED=true` only when all Razorpay credentials, plan IDs and the webhook secret are configured. Missing configuration with the flag enabled fails registration closed instead of allowing a free account. With the flag off, the current legacy production registration remains available. Existing accounts are not migrated automatically.
+Use `SUBSCRIPTIONS_ENABLED=true` only when all Razorpay credentials, plan IDs and the webhook secret are configured. Missing configuration with the flag enabled fails registration closed instead of allowing a free account. With the flag off, new production registrations fail closed; the legacy registration branch is limited to local previews. Existing accounts are not migrated automatically.
 
 Incomplete records without a gateway subscription expire after 24 hours. Gateway-linked records are retained so delayed authorization cannot orphan an AutoPay mandate. The vendor can log in to renew the limited setup session and resume. A future cleanup job must cancel abandoned created mandates before deleting their registration records; automated cleanup is not implemented yet. Completed records are removed after the browser receives a normal session; webhook-only completion still allows normal login.
 
@@ -96,9 +96,21 @@ Forms validate when submitted and clear validation feedback when edited. Save dr
 Approval, requested changes and publication changes create private account notifications, with the latest 30 retained. A new unread approval shows an accessible dashboard dialog once acknowledged. Notifications are visible only to the owning account. Email sends use the registered account address, a short delivery lease and a stable Resend idempotency key. A failed email does not roll back approval; administrators can retry from the review page. The delivery label means provider acceptance, not confirmed inbox receipt. Resend keeps idempotency keys for 24 hours: https://resend.com/docs/dashboard/emails/idempotency-keys . No new environment variables are required beyond the existing Resend sender configuration.
 
 Validation: 76 automated tests pass. Isolated browser checks exercise registration warnings only on submit, partial drafts, blocking incomplete approval, submission receipts, automatic admin queue updates, change requests, re-submission, failed approval email and retry, approval dialog acknowledgement, owner-only notice access and dirty-form protection. Vendor and admin layouts are checked at 390, 820 and 1440 pixels. Mail is mocked in these checks; no production vendor decisions or live email sends are used for testing.
-# Dashboard usability — 29 September 2026
+## Dashboard usability — 29 September 2026
 
 - The vendor profile editor now has sticky Preview, Save draft and Submit for review controls, with an unsaved-changes indicator and save feedback beside the controls. A browser reload/close warning protects unsaved edits; uploads and removal actions also block automatic workspace refresh until saved.
 - Preview reads the current form values without saving or submitting. It includes business information, logo and portfolio photos, and excludes private verification documents. Escape or Close returns to editing. Existing review, publication and plan limits remain unchanged.
 - Vendor and super-admin enquiry inboxes support search, status filters with counts, contact shortcuts, readable dates and expandable messages. Status changes use the existing authenticated endpoint, show progress and confirmation, and refresh saved data. Mobile uses cards; tablet and desktop use a table.
 - Validation: 76 existing automated tests and production build passed. Isolated Playwright checks at 390, 820 and 1440 px covered unsaved preview, dialog focus, sticky controls, search/filter/empty states, contact links, persisted vendor/admin status changes, failed-save feedback and portfolio rendering. The review/approval/email-retry regression flow also passed with a mocked email provider. No production decisions, emails, payments or fixture accounts were created.
+
+## Vendor registration release checks — 29 September 2026
+
+Signup now reports delayed verification email accurately, prefills the resend address, normalizes email and legacy Indian phone formats for duplicate protection, rejects malformed phone numbers and filled bot fields, and disables editing during submission. Registration, resend and password recovery share a three-request recipient budget per 15 minutes; invalid signup fields do not consume that email budget. Normal IP limits still apply.
+
+Production registration fails closed when AutoPay is disabled or misconfigured. A Vercel Production deployment refuses Test Mode keys. Health exposes the non-secret billing mode, and release checks can require `EXPECT_SUBSCRIPTIONS=true` and `EXPECT_BILLING_MODE=live`. Checkout recovery explicitly describes the saved mandate plan when the vendor selects a different plan; closing Checkout explains how to resume or check authorization. Database errors in registration setup return a recoverable JSON response.
+
+Super-admin Registration progress shows unfinished email/AutoPay setup and verified accounts without a business profile, with the latest ten registrations visible. Workspace version updates include registration and account activation changes. Credentials, verification hashes and setup-session hashes are never sent to this panel.
+
+Verification: 81 automated tests and a production build pass. Isolated Playwright browser/API checks at 390, 820 and 1440 px cover signup, consent reset, email verification, pending-account denial, recipient rate limits, Checkout schedule, invalid/unapproved callback denial, dismissal, recovery to the original agreed plan, quota enforcement, signed lifecycle replay and stale-event handling. Gateway and mail are mocked. Live public release checks pass; a read-only check using the existing local Live credential file confirms all four gateway plan prices. No live mandate, charge, email or production fixture account is created by QA.
+
+Before inviting vendors, the owner must finish one Live signup at https://www.occanova.com/register using their own email and bank details. Confirm verification email receipt, account activation, the agreed plan and exact first-debit date in the studio and Razorpay, and a successful real lifecycle webhook to `/api/billing/webhook`. Bank OTPs stay in Checkout. If the test account is disposable, cancel its mandate through Plan & billing and confirm cancellation in Razorpay. Handler probes and simulated webhooks do not prove actual provider delivery. Search indexing remains disabled for the vendor-registration rollout.

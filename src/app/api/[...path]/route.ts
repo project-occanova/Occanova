@@ -11,7 +11,7 @@ import {rateLimited} from '@/lib/rate-limit';
 import {sendEnquiryNotifications,sendResetEmail,sendVerificationEmail} from '@/lib/email';
 import {cleanupOrphanedUploads,createDownload,deleteUploads,validVendorKey,vendorStorageKeys} from '@/lib/storage';
 import {mobileOtpHash,normalizeIndianMobile,sendMobileOtp} from '@/lib/mobile-otp';
-import {billingEnabled} from '@/lib/subscriptions';
+import {billingEnabled,billingMode} from '@/lib/subscriptions';
 import {assertPlanAccess,assertPortfolioLimit,PlanAccessError} from '@/lib/plan-access';
 import {startRegistration} from '@/lib/registration';
 import {registrationCookie,registrationCookieOptions} from '@/lib/registration-session';
@@ -24,7 +24,7 @@ export const runtime='nodejs';
 const fail=(message:string,status=400)=>NextResponse.json({error:message},{status});
 export async function GET(req:NextRequest,{params}:{params:Promise<{path:string[]}>}) {
  const route=(await params).path.join('/');
- if(route==='health')return NextResponse.json({ok:true,database:hasDatabase(),email:hasEmail(),mobileOtp:hasMobileOtp(),subscriptions:billingEnabled(),storage:hasStorage(),writable:backendReady()&&!readOnlyDeployment(),intake:publicIntakeEnabled()});
+ if(route==='health')return NextResponse.json({ok:true,database:hasDatabase(),email:hasEmail(),mobileOtp:hasMobileOtp(),subscriptions:billingEnabled(),billingMode:billingMode(),storage:hasStorage(),writable:backendReady()&&!readOnlyDeployment(),intake:publicIntakeEnabled()});
  if(route==='workspace-status'){
   const value=(await cookies()).get('occanova_session')?.value;if(!value)return fail('Please sign in.',401);
   const state=await readState();const session=state.sessions.find(row=>row.hash===digest(value)&&row.expires>Date.now());const user=state.users.find(row=>row.id===session?.userId);
@@ -65,9 +65,15 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
   if(await rateLimited(ip+route,route.startsWith('auth/')?10:30))return fail('Too many requests. Please try again in a minute.',429);
   const raw=await req.text();if(raw.length>16000)return fail('Request too large',413);
   const b=JSON.parse(raw||'{}');
+  // Sharing a recipient budget across public email actions prevents resend/reset spam.
+  if(['auth/resend','auth/forgot'].includes(route)){
+   const email=z.string().trim().email().max(160).transform(value=>value.toLowerCase()).parse(b.email);
+   if(await rateLimited(`account-email:${digest(email)}`,3,15*60*1000))return fail('Too many email requests for this address. Please wait 15 minutes and check your inbox or spam folder.',429);
+  }
   if(route==='auth/register') {
-   if(process.env.SUBSCRIPTIONS_ENABLED==='true'&&!billingEnabled())return fail('AutoPay registration is temporarily unavailable. Please try again later.',503);
+   if((!localPreview()||process.env.SUBSCRIPTIONS_ENABLED==='true')&&!billingEnabled())return fail('AutoPay registration is temporarily unavailable. Please try again later.',503);
    const v=registerSchema.parse(b);const t=token();const paid=billingEnabled();
+   if(await rateLimited(`account-email:${digest(v.email)}`,3,15*60*1000))return fail('Too many email requests for this address. Please wait 15 minutes and check your inbox or spam folder.',429);
    const id=await mutate(s=>{
     if(paid)return startRegistration(s,{email:v.email,phone:v.phone,passwordHash:hashPassword(v.password),plan:v.plan,autopayConsent:v.autopayConsent,verificationHash:digest(t)}).id;
     if(s.users.some(u=>u.email===v.email||normalizeIndianMobile(u.phone)===v.phone))throw Error('An account already uses this email or phone.');
@@ -75,7 +81,7 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
    });
    let delivered=false;if(hasEmail()){try{await sendVerificationEmail(v.email,t);delivered=true;}catch{/* Verification can be resumed through resend. */}}
    const directVerification=localPreview()||!hasEmail();
-   return NextResponse.json({ok:true,id,message:paid?'Registration started. Verify your email, then authorize AutoPay to activate your vendor account.':directVerification?'Account created. Use the secure verification link below to activate it.':delivered?'Account created. Check your email to verify your address.':'Account created, but email delivery was delayed. Request a new verification link.',verificationUrl:directVerification?`/verify?token=${t}`:undefined});
+   return NextResponse.json({ok:true,id,email:v.email,emailDelivery:directVerification?'preview':delivered?'sent':'delayed',message:paid?(directVerification?'Registration saved. Verify your email, then authorize AutoPay to activate your vendor account.':delivered?'Registration saved. Open the verification email, then authorize AutoPay to activate your account.':'Registration saved, but we could not send the verification email. Request a new link below; your account remains inactive.'):directVerification?'Account created. Use the secure verification link below to activate it.':delivered?'Account created. Check your email to verify your address.':'Account created, but email delivery was delayed. Request a new verification link.',verificationUrl:directVerification?`/verify?token=${t}`:undefined});
   }
   if(route==='auth/verify') {
    const value=z.string().length(64).parse(b.token);const sessionToken=token();
@@ -109,10 +115,10 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
    const t=token();await mutate(s=>{s.sessions=s.sessions.filter(x=>x.expires>Date.now());s.sessions.push({hash:digest(t),userId:user.id,expires:Date.now()+7*86400000});});(await cookies()).set('occanova_session',t,cookieOptions);return NextResponse.json({ok:true,redirect:user.role==='admin'?'/admin':'/dashboard'});
   }
   if(route==='auth/logout'){const value=(await cookies()).get('occanova_session')?.value;await mutate(s=>{s.sessions=s.sessions.filter(x=>x.hash!==digest(value??''));});(await cookies()).delete('occanova_session');(await cookies()).delete(registrationCookie);return NextResponse.json({ok:true});}
-  if(route==='auth/forgot') {if(!hasEmail()&&!localPreview())return fail('Password reset email is not available yet. Please contact Occanova support.',503);const email=z.string().email().transform(x=>x.toLowerCase()).parse(b.email);const t=token();const found=await mutate(s=>issuePasswordReset(s,email,digest(t)));if(found)await sendResetEmail(email,t);return NextResponse.json({ok:true,message:'If an account or registration exists, a password reset link has been sent.',verificationUrl:found&&localPreview()?`/reset-password?token=${t}`:undefined});}
+  if(route==='auth/forgot') {if(!hasEmail()&&!localPreview())return fail('Password reset email is not available yet. Please contact Occanova support.',503);const email=z.string().trim().email().max(160).transform(x=>x.toLowerCase()).parse(b.email);const t=token();const found=await mutate(s=>issuePasswordReset(s,email,digest(t)));if(found)await sendResetEmail(email,t);return NextResponse.json({ok:true,message:'If an account or registration exists, a password reset link has been sent.',verificationUrl:found&&localPreview()?`/reset-password?token=${t}`:undefined});}
   if(route==='auth/resend') {
    if(!hasEmail()&&!localPreview())return fail('Verification email is temporarily unavailable.',503);
-   const email=z.string().email().transform(x=>x.toLowerCase()).parse(b.email);const t=token();let found=false;
+   const email=z.string().trim().email().max(160).transform(x=>x.toLowerCase()).parse(b.email);const t=token();let found=false;
    await mutate(s=>{const user=s.users.find(u=>u.email===email&&!u.verified);if(user){found=true;s.tokens=s.tokens.filter(x=>!(x.userId===user.id&&x.kind==='verify'));s.tokens.push({hash:digest(t),userId:user.id,kind:'verify',expires:Date.now()+86400000});}
     const pending=s.registrations.find(row=>row.email===email&&!row.verified&&!row.completedUserId);if(pending){found=true;pending.verificationHash=digest(t);pending.expires=Date.now()+86400000;}
    });

@@ -20,7 +20,11 @@ export function razorpayPlanId(plan:PlanId){
  if(!value||!/^plan_[A-Za-z0-9]+$/.test(value))throw Error(`${key} is not configured.`);
  return value;
 }
-export function billingConfigured(){return Boolean(process.env.RAZORPAY_KEY_ID&&process.env.RAZORPAY_KEY_SECRET&&process.env.RAZORPAY_WEBHOOK_SECRET&&planIds.every(plan=>/^plan_[A-Za-z0-9]+$/.test(process.env[`RAZORPAY_PLAN_${plan.toUpperCase()}`]||'')));}
+export function billingMode(){return process.env.RAZORPAY_KEY_ID?.startsWith('rzp_live_')?'live':process.env.RAZORPAY_KEY_ID?.startsWith('rzp_test_')?'test':'unconfigured';}
+export function billingConfigured(){
+ if(process.env.VERCEL==='1'&&process.env.VERCEL_ENV==='production'&&billingMode()!=='live')return false;
+ return Boolean(process.env.RAZORPAY_KEY_ID&&process.env.RAZORPAY_KEY_SECRET&&process.env.RAZORPAY_WEBHOOK_SECRET&&planIds.every(plan=>/^plan_[A-Za-z0-9]+$/.test(process.env[`RAZORPAY_PLAN_${plan.toUpperCase()}`]||'')));
+}
 export function billingEnabled(){return process.env.SUBSCRIPTIONS_ENABLED==='true'&&billingConfigured();}
 
 export function validSignature(body:string,signature:string,secret:string){

@@ -17,11 +17,12 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{action:stri
  const expected=process.env.NEXT_PUBLIC_SITE_URL||`${req.nextUrl.protocol}//${req.headers.get('host')}`;
  if(req.headers.get('origin')!==new URL(expected).origin)return fail('Invalid request origin',403);
  if(Number(req.headers.get('content-length')||0)>3000)return fail('Request too large',413);
+ try{
  const pending=await currentRegistration();
  if(!pending){const user=await currentUser();if(user?.role==='vendor'&&user.subscription?.trialUsedAt)return NextResponse.json({ok:true,redirect:'/dashboard'});return fail('Verify your email or log in to resume registration.',401);}
  if(pending.completedUserId){await finishRegistrationSession(pending.completedUserId);return NextResponse.json({ok:true,redirect:'/dashboard'});}
- try{
-  const body=await req.json();
+  const raw=await req.text();if(raw.length>3000)return fail('Request too large',413);
+  const body=JSON.parse(raw||'{}');
   if(action==='checkout'){
    const input=z.object({plan:z.string(),consent:z.literal(true)}).parse(body);
    if(!isPlanId(input.plan))return fail('Choose a valid plan.');

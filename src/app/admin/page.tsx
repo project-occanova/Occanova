@@ -8,6 +8,7 @@ import {Workspace} from '@/components/workspace';
 import {WorkspaceLiveUpdates} from '@/components/workspace-live-updates';
 import {workspaceVersion} from '@/lib/workspace-version';
 import {reviewLabels} from '@/lib/review-labels';
+import {subscriptionPlans} from '@/lib/plans';
 
 export const dynamic='force-dynamic';
 
@@ -20,6 +21,8 @@ export default async function Admin({searchParams}:{searchParams:Promise<Record<
   const filtered=s.vendors.filter(v=>(!p.q||`${v.name} ${v.service}`.toLowerCase().includes(p.q.toLowerCase()))&&(!p.status||v.status===p.status)&&(!p.category||v.category===p.category)&&(!p.service||v.service===p.service)&&(!p.city||v.city===p.city));
   const visible=publicVendors(s.vendors,{},s.users);const visibleIds=new Set(visible.map(vendor=>vendor.id));
   const pending=s.vendors.filter(x=>x.status==='pending').sort((a,b)=>(a.submittedAt||'').localeCompare(b.submittedAt||''));
+  const registrations=s.registrations.filter(row=>!row.completedUserId&&(row.expires>Date.now()||row.subscription?.gatewayId)).toSorted((a,b)=>b.autopayConsentAt.localeCompare(a.autopayConsentAt));
+  const awaitingProfiles=s.users.filter(account=>account.role==='vendor'&&account.verified&&!s.vendors.some(vendor=>vendor.userId===account.id));
 
   return <Workspace admin email={user.email}>
     <header id="overview" className="workspace-intro">
@@ -38,6 +41,12 @@ export default async function Admin({searchParams}:{searchParams:Promise<Record<
     <section id="pending-reviews" className="panel workspace-section attention-section" aria-labelledby="attention-heading">
       <div className="workspace-section-heading"><div><h2 id="attention-heading">Pending reviews ({pending.length})</h2><p>Review the oldest submissions first. New submissions appear here automatically.</p></div><Link href="/admin?status=pending#vendors">View all pending</Link></div>
       {pending.length?<div className="attention-list">{pending.slice(0,5).map(v=><article key={v.id}><div><strong>{v.name}</strong><span>{v.category} · {v.city}</span>{v.submittedAt&&<small>Submitted {new Date(v.submittedAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',timeZone:'Asia/Kolkata'})}</small>}</div><span className="status pending">Pending review</span><Link className="button small" href={'/admin/vendors/'+v.id}>Review</Link></article>)}</div>:<div className="empty-state compact"><h3>You’re all caught up.</h3><p>New submissions will appear here for review.</p></div>}
+    </section>
+
+    <section id="registrations" className="panel workspace-section" aria-labelledby="registration-progress-heading">
+      <div className="workspace-section-heading"><div><h2 id="registration-progress-heading">Registration progress</h2><p>Accounts activate after email verification and AutoPay authorization. Profile review happens afterwards.</p></div><span>{registrations.length} in progress</span></div>
+      <div className="registration-rollout-counts"><span><strong>{registrations.filter(row=>!row.verified).length}</strong> Awaiting email verification</span><span><strong>{registrations.filter(row=>row.verified).length}</strong> Awaiting AutoPay setup</span><span><strong>{awaitingProfiles.length}</strong> Accounts awaiting a profile</span></div>
+      {registrations.length?<><p className="quiet-note">Latest {Math.min(10,registrations.length)} registrations. Vendors can use Log in to resume setup or Resend verification email. AutoPay authorization cannot be bypassed by an administrator.</p><div className="table-wrap responsive-table"><table><thead><tr><th>Vendor contact</th><th>Plan</th><th>Next step</th><th>Latest step</th></tr></thead><tbody>{registrations.slice(0,10).map(row=><tr key={row.id}><td data-label="Contact"><strong>{row.email}</strong><small>{row.phone}</small></td><td data-label="Plan">{subscriptionPlans[row.plan].name}<small>₹{subscriptionPlans[row.plan].monthlyRupees}/month · GST included</small></td><td data-label="Next step">{!row.verified?'Verify email':row.subscription?.gatewayId?'Finish or check AutoPay authorization':'Set up AutoPay'}{row.subscription&&<small>Mandate: {row.subscription.status}</small>}</td><td data-label="Latest step">{new Date(row.autopayConsentAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Kolkata'})}</td></tr>)}</tbody></table></div></>:<div className="empty-state compact"><h3>No unfinished registrations.</h3><p>New signups will appear here until their accounts activate.</p></div>}
     </section>
 
     <section id="vendors" className="panel workspace-section">
