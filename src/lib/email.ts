@@ -16,7 +16,9 @@ export function sendVendorUpdateEmail(email:string,notice:VendorNotification){
  return send(email,`Occanova: ${notice.title}`,`<h1>${esc(notice.title)}</h1><p>${esc(notice.message)}</p><p><a href="${esc(href)}">Open your update</a></p><p>Manage your profile in your <a href="${siteUrl()}/dashboard">vendor studio</a>. For help, contact info@occanova.com.</p>`,`${notice.title}\n${notice.message}\n${href}\nVendor studio: ${siteUrl()}/dashboard\nSupport: info@occanova.com`,`vendor-update/${notice.id}`);
 }
 
-export const sendVerificationEmail=(email:string,value:string)=>send(email,'Verify your Occanova vendor account',`<h1>Welcome to Occanova</h1><p>Verify your email to finish creating your vendor account.</p><p><a href="${siteUrl()}/verify?token=${value}">Verify email</a></p><p>This link expires in 24 hours.</p>`,`Verify your Occanova account: ${siteUrl()}/verify?token=${value}\nThis link expires in 24 hours.`);
+export const sendVerificationEmail=(email:string,value:string)=>send(email,'Verify your Occanova vendor account',`<h1>Welcome to Occanova</h1><p>Verify your email to finish creating your vendor account.</p><p><a href="${siteUrl()}/verify?token=${value}">Verify email</a></p><p>This link expires in 24 hours. If it expires, <a href="${siteUrl()}/resend-verification">request a new verification link</a>. If your email is already verified, <a href="${siteUrl()}/login">log in to continue</a>.</p>`,`Verify your Occanova account: ${siteUrl()}/verify?token=${value}\nThis link expires in 24 hours.
+Request a new link: ${siteUrl()}/resend-verification
+Already verified? Log in: ${siteUrl()}/login`);
 export const sendResetEmail=(email:string,value:string)=>send(email,'Reset your Occanova password',`<h1>Reset your password</h1><p><a href="${siteUrl()}/reset-password?token=${value}">Choose a new password</a></p><p>This link expires in 30 minutes. Ignore this email if you did not request it.</p>`,`Reset your Occanova password: ${siteUrl()}/reset-password?token=${value}\nThis link expires in 30 minutes.`);
 export function sendFirstChargeReminder(email:string,plan:PlanId,date:string){
  const amount=subscriptionPlans[plan].monthlyRupees;

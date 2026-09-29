@@ -9,6 +9,7 @@ import {WorkspaceLiveUpdates} from '@/components/workspace-live-updates';
 import {workspaceVersion} from '@/lib/workspace-version';
 import {reviewLabels} from '@/lib/review-labels';
 import {subscriptionPlans} from '@/lib/plans';
+import {registrationRecoveryExpiry} from '@/lib/email-verification';
 
 export const dynamic='force-dynamic';
 
@@ -21,7 +22,7 @@ export default async function Admin({searchParams}:{searchParams:Promise<Record<
   const filtered=s.vendors.filter(v=>(!p.q||`${v.name} ${v.service}`.toLowerCase().includes(p.q.toLowerCase()))&&(!p.status||v.status===p.status)&&(!p.category||v.category===p.category)&&(!p.service||v.service===p.service)&&(!p.city||v.city===p.city));
   const visible=publicVendors(s.vendors,{},s.users);const visibleIds=new Set(visible.map(vendor=>vendor.id));
   const pending=s.vendors.filter(x=>x.status==='pending').sort((a,b)=>(a.submittedAt||'').localeCompare(b.submittedAt||''));
-  const registrations=s.registrations.filter(row=>!row.completedUserId&&(row.expires>Date.now()||row.subscription?.gatewayId)).toSorted((a,b)=>b.autopayConsentAt.localeCompare(a.autopayConsentAt));
+  const registrations=s.registrations.filter(row=>!row.completedUserId&&(registrationRecoveryExpiry(row)>Date.now()||row.subscription?.gatewayId)).toSorted((a,b)=>b.autopayConsentAt.localeCompare(a.autopayConsentAt));
   const awaitingProfiles=s.users.filter(account=>account.role==='vendor'&&account.verified&&!s.vendors.some(vendor=>vendor.userId===account.id));
 
   return <Workspace admin email={user.email}>

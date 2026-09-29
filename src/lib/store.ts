@@ -6,14 +6,15 @@ import {mongo,mongoConfigured} from './db';
 import {initialState} from './seed';
 import {normalizeCategories,normalizeVendorTaxonomy} from './taxonomy';
 import type {State} from './types';
+import {registrationRecoveryExpiry} from './email-verification';
 
 const file=process.env.VERCEL!=='1'&&process.env.OCCANOVA_PREVIEW_FILE?path.resolve(process.env.OCCANOVA_PREVIEW_FILE):path.join(process.cwd(),'data','preview.json');
 const globals=globalThis as typeof globalThis&{occanovaQueue?:Promise<unknown>;occanovaSeed?:Promise<void>};
 type StateList=keyof State;
 type MongoDoc={_id:string;[key:string]:unknown};
 type MetaDoc={_id:string;revision:number;initializedAt?:Date;seedVersion?:number};
-// Increment when the default categories or locations need to be merged again.
-const seedVersion=4;
+// Increment when persisted data needs a migration or seed choices need merging.
+const seedVersion=5;
 const collections:StateList[]=['vendors','users','registrations','paymentOrders','enquiries','sessions','tokens','categories','locations','audit'];
 const keys:Record<StateList,string>={vendors:'id',users:'id',registrations:'id',paymentOrders:'id',enquiries:'id',sessions:'hash',tokens:'hash',categories:'slug',locations:'slug',audit:'id'};
 
@@ -60,7 +61,7 @@ async function mongoRead(session?:ClientSession):Promise<State>{
 function document(name:StateList,row:Record<string,unknown>,order:number){
   const value={...row,_id:String(row[keys[name]]),_order:order} as MongoDoc;
   if((name==='sessions'||name==='tokens')&&typeof row.expires==='number')value.expiresAt=new Date(row.expires);
-  if(name==='registrations'&&typeof row.expires==='number'&&(row.completedUserId||!(row.subscription as {gatewayId?:string}|undefined)?.gatewayId))value.expiresAt=new Date(row.expires);
+  if(name==='registrations'&&typeof row.expires==='number'&&(row.completedUserId||!(row.subscription as {gatewayId?:string}|undefined)?.gatewayId))value.expiresAt=new Date(row.completedUserId?row.expires:registrationRecoveryExpiry(row as State['registrations'][number]));
   return value;
 }
 
@@ -101,6 +102,10 @@ async function ensureMongoSeed(){
           const savedVendors=await db.collection<MongoDoc>('vendors').find({},{session}).sort({_order:1}).toArray();
           const beforeVendors=savedVendors.map(clean<State['vendors'][number]>);
           await writeList('vendors',beforeVendors,beforeVendors.map(v=>normalizeVendorTaxonomy(v,categoryRows)),session);
+          // Migrate existing pending registrations away from the 24-hour link TTL.
+          const savedRegistrations=await db.collection<MongoDoc>('registrations').find({},{session}).sort({_order:1}).toArray();
+          const beforeRegistrations=savedRegistrations.map(clean<State['registrations'][number]>);
+          await writeList('registrations',beforeRegistrations,beforeRegistrations.map(row=>({...row,verificationExpires:row.verificationExpires??row.expires,recoveryExpires:registrationRecoveryExpiry(row)})),session);
           const locationRows=seed.locations as unknown as Record<string,unknown>[];
           await db.collection<MongoDoc>('locations').bulkWrite(locationRows.map((row,i)=>({updateOne:{
             filter:{_id:String(row.slug)},update:{$setOnInsert:{...row,_order:i}},upsert:true,

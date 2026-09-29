@@ -20,6 +20,7 @@ import {validationFeedback} from '@/lib/form-feedback';
 import {notifyVendor,reviewNotificationKind,markNotificationsRead} from '@/lib/vendor-notifications';
 import {deliverReviewNotification} from '@/lib/review-delivery';
 import {workspaceVersion} from '@/lib/workspace-version';
+import {issueEmailVerification,revokeEmailVerification,verifyEmail} from '@/lib/email-verification';
 export const runtime='nodejs';
 const fail=(message:string,status=400)=>NextResponse.json({error:message},{status});
 export async function GET(req:NextRequest,{params}:{params:Promise<{path:string[]}>}) {
@@ -84,16 +85,11 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
    return NextResponse.json({ok:true,id,email:v.email,emailDelivery:directVerification?'preview':delivered?'sent':'delayed',message:paid?(directVerification?'Registration saved. Verify your email, then authorize AutoPay to activate your vendor account.':delivered?'Registration saved. Open the verification email, then authorize AutoPay to activate your account.':'Registration saved, but we could not send the verification email. Request a new link below; your account remains inactive.'):directVerification?'Account created. Use the secure verification link below to activate it.':delivered?'Account created. Check your email to verify your address.':'Account created, but email delivery was delayed. Request a new verification link.',verificationUrl:directVerification?`/verify?token=${t}`:undefined});
   }
   if(route==='auth/verify') {
-   const value=z.string().length(64).parse(b.token);const sessionToken=token();
-   const pending=await mutate(s=>{
-    const registration=s.registrations.find(row=>row.verificationHash===digest(value)&&!row.verified&&row.expires>Date.now());
-    if(registration){registration.verified=true;registration.verificationHash=undefined;registration.sessionHash=digest(sessionToken);registration.expires=Date.now()+86400000;return true;}
-    const t=s.tokens.find(t=>t.hash===digest(value)&&t.kind==='verify'&&t.expires>Date.now());
-    if(!t)throw Error('This verification link has expired or was already used.');
-    const account=s.users.find(u=>u.id===t.userId);if(!account)throw Error('Account not found.');account.verified=true;s.tokens=s.tokens.filter(x=>x!==t);return false;
-   });
-   if(pending){(await cookies()).set(registrationCookie,sessionToken,registrationCookieOptions);return NextResponse.json({ok:true,redirect:'/register/complete'});}
-   return NextResponse.json({ok:true});
+   if(typeof b.token!=='string'||!/^[a-f0-9]{64}$/.test(b.token))return fail('This verification link is incomplete or invalid. Request a new link below.');
+   const sessionToken=token();const jar=await cookies();const current=jar.get(registrationCookie)?.value;
+   const result=await mutate(s=>verifyEmail(s,digest(b.token),digest(sessionToken),current?digest(current):undefined));
+   if(result.issueSession)jar.set(registrationCookie,sessionToken,registrationCookieOptions);
+   return NextResponse.json({ok:true,alreadyVerified:result.alreadyVerified,redirect:result.pending?'/register/complete':undefined,message:result.alreadyVerified?'Your email is already verified. Log in to continue your registration or open your dashboard.':'Email verified. Log in to continue.'});
   }
   if(route==='auth/login') {
    const v=z.object({identity:z.string().trim().min(1).max(160),password:z.string().min(1).max(128),admin:z.boolean().optional().default(false)}).parse(b);const s=await readState();const mobile=normalizeIndianMobile(v.identity);const user=s.users.find(u=>u.email===v.identity.toLowerCase()||(mobile&&normalizeIndianMobile(u.phone)===mobile));
@@ -118,12 +114,13 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
   if(route==='auth/forgot') {if(!hasEmail()&&!localPreview())return fail('Password reset email is not available yet. Please contact Occanova support.',503);const email=z.string().trim().email().max(160).transform(x=>x.toLowerCase()).parse(b.email);const t=token();const found=await mutate(s=>issuePasswordReset(s,email,digest(t)));if(found)await sendResetEmail(email,t);return NextResponse.json({ok:true,message:'If an account or registration exists, a password reset link has been sent.',verificationUrl:found&&localPreview()?`/reset-password?token=${t}`:undefined});}
   if(route==='auth/resend') {
    if(!hasEmail()&&!localPreview())return fail('Verification email is temporarily unavailable.',503);
-   const email=z.string().trim().email().max(160).transform(x=>x.toLowerCase()).parse(b.email);const t=token();let found=false;
-   await mutate(s=>{const user=s.users.find(u=>u.email===email&&!u.verified);if(user){found=true;s.tokens=s.tokens.filter(x=>!(x.userId===user.id&&x.kind==='verify'));s.tokens.push({hash:digest(t),userId:user.id,kind:'verify',expires:Date.now()+86400000});}
-    const pending=s.registrations.find(row=>row.email===email&&!row.verified&&!row.completedUserId);if(pending){found=true;pending.verificationHash=digest(t);pending.expires=Date.now()+86400000;}
-   });
-   if(found)await sendVerificationEmail(email,t);
-   return NextResponse.json({ok:true,message:'If an unverified registration exists, a new verification link has been sent.',verificationUrl:found&&localPreview()?`/verify?token=${t}`:undefined});
+   const email=z.string().trim().email().max(160).transform(x=>x.toLowerCase()).parse(b.email);const t=token();const hash=digest(t);
+   const found=await mutate(s=>issueEmailVerification(s,email,hash));
+   if(found){try{await sendVerificationEmail(email,t);}catch{
+    await mutate(s=>revokeEmailVerification(s,hash));
+    return fail('We could not send the verification email. Any earlier unexpired link still works. Please try again later or contact info@occanova.com.',503);
+   }}
+   return NextResponse.json({ok:true,message:'If your registration still needs verification, a new link has been sent. Check your inbox and spam folder. Already verified? Log in to continue. If registration was started over 30 days ago, register again.',verificationUrl:found&&localPreview()?`/verify?token=${t}`:undefined});
   }
   if(route==='auth/reset'){const v=z.object({token:z.string().length(64),password:z.string().min(10).max(128)}).parse(b);await mutate(s=>resetAccountPassword(s,digest(v.token),hashPassword(v.password)));return NextResponse.json({ok:true});}
   if(route==='enquiries') {const v=enquirySchema.parse(b);const saved=await mutate(s=>{const vendor=publicVendors(s.vendors,{},s.users).find(x=>x.id===v.vendorId&&!x.sample);if(!vendor)throw Error('This vendor is unavailable.');const {website,...data}=v;void website;const enquiry={...data,id:randomUUID(),status:'new' as const,createdAt:new Date().toISOString()};s.enquiries.push(enquiry);return {enquiry,vendor};});let delivered=true;try{await sendEnquiryNotifications(saved.enquiry,saved.vendor);}catch{delivered=false;}return NextResponse.json({ok:true,id:saved.enquiry.id,message:localPreview()?'Enquiry saved in this local preview. No notification was sent.':delivered?'Your enquiry has been sent to the vendor.':'Your enquiry was saved. The email notification is delayed.'});}

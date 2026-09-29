@@ -31,9 +31,9 @@ test('duplicate email or phone cannot produce another registration or active acc
  for(const identity of ['email','phone'] as const){const {state,pending,remote}=fixture();assert.throws(()=>startRegistration(state,{...input,[identity]:pending[identity]},now),/already in progress/);
  state.users.push({id:'other',email:identity==='email'?input.email:'other@example.com',phone:identity==='phone'?input.phone:'+918765432109',passwordHash:'hash',role:'vendor',verified:true});assert.throws(()=>activateRegistration(state,pending.id,remote,now),/already uses/);assert.equal(state.users.length,1);}
 });
-test('expired unverified registration can restart; a gateway-linked registration is retained',()=>{
- const state=initialState();startRegistration(state,input,now);const fresh=startRegistration(state,input,now+86400001);assert.equal(state.registrations.length,1);fresh.subscription={plan:'starter',status:'created',gatewayId:'sub_keep',updatedAt:new Date(now).toISOString()};
- assert.throws(()=>startRegistration(state,input,now+2*86400001),/already in progress/);assert.equal(state.registrations[0].subscription!.gatewayId,'sub_keep');
+test('registration can restart after recovery expires; a gateway-linked registration is retained',()=>{
+ const state=initialState();startRegistration(state,input,now);assert.throws(()=>startRegistration(state,input,now+86400001),/already in progress/);const fresh=startRegistration(state,input,now+30*86400000+1);assert.equal(state.registrations.length,1);fresh.subscription={plan:'starter',status:'created',gatewayId:'sub_keep',updatedAt:new Date(now).toISOString()};
+ assert.throws(()=>startRegistration(state,input,now+65*86400000),/already in progress/);assert.equal(state.registrations[0].subscription!.gatewayId,'sub_keep');
 });
 test('checkout creation uses server price and two months from setup; reuse, retry and remaining trial are safe',async t=>{
  const originalFetch=globalThis.fetch;const keys=['RAZORPAY_KEY_ID','RAZORPAY_KEY_SECRET','RAZORPAY_PLAN_STARTER','RAZORPAY_PLAN_PRO'];const old=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
