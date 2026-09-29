@@ -5,6 +5,7 @@ import {useRouter} from 'next/navigation';
 import {CheckCircle2,Mail} from 'lucide-react';
 import {SubmitForm} from './submit-form';
 import {authRequest as request} from '@/lib/auth-request';
+import {AuthProgress} from './auth-progress';
 
 export function EmailVerificationForm({mode,token,initialEmail=''}:{mode:'verify'|'resend';token?:string;initialEmail?:string}){
  const router=useRouter();const lock=useRef(false);
@@ -17,6 +18,7 @@ export function EmailVerificationForm({mode,token,initialEmail=''}:{mode:'verify
   catch(e){setError((e as Error).message);}finally{lock.current=false;setBusy(null);}
  }
  return <div className="email-verification-flow">
+  <AuthProgress busy={Boolean(busy)}/>
   {verified?<div className="success-state" role="status"><CheckCircle2 size={30}/><p>{verified}</p><Link className="button" href={loginHref}>Log in to continue</Link></div>:mode==='verify'&&<div className="verification-link-action">
    <p className="quiet-note">Confirm your email to continue your vendor registration. Verification links work for 24 hours.</p>
    {!validLink&&<p className="notice">This link is missing or incomplete. Request a fresh link below using the email you registered with.</p>}

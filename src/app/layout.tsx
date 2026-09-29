@@ -14,4 +14,4 @@ export const metadata:Metadata={
   twitter:{card:'summary_large_image',title:'Occanova — Your event, your way.',description,images:['/occanova-logo.jpg']},
   robots:{index:indexable,follow:indexable,noarchive:!indexable},
 };
-export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en" data-scroll-behavior="smooth"><body><a className="skip-link" href="#main">Skip to content</a>{children}</body></html>;}
+export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en" data-scroll-behavior="smooth"><head><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous"/></head><body><a className="skip-link" href="#main">Skip to content</a>{children}</body></html>;}

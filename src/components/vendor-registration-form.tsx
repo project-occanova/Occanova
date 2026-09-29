@@ -1,19 +1,22 @@
 'use client';
-import {useState} from 'react';
+import {useRef,useState} from 'react';
 import Link from 'next/link';
 import {Eye,EyeOff,ArrowUpRight} from 'lucide-react';
 import {planIds,subscriptionPlans,type PlanId} from '@/lib/plans';
 import {TrialOffer} from './trial-offer';
 import {SubmitForm} from './submit-form';
+import {authRequest} from '@/lib/auth-request';
+import {AuthProgress} from './auth-progress';
 
 export function VendorRegistrationForm(){
+ const lock=useRef(false);
  const[plan,setPlan]=useState<PlanId>('starter'),[autopayConsent,setAutopayConsent]=useState(false),[busy,setBusy]=useState(false),[show,setShow]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[verificationUrl,setVerificationUrl]=useState(''),[email,setEmail]=useState('');
  const details=subscriptionPlans[plan];
  if(message)return <div className="success-state" role="status"><h3>Verify your email next.</h3><p>{message}</p><p><strong>{email}</strong></p>{verificationUrl?<Link className="button" href={verificationUrl}>Verify email and continue</Link>:<p>Check your inbox and spam folder for the verification link to set up AutoPay.</p>}<Link href={'/resend-verification?email='+encodeURIComponent(email)}>Resend verification email</Link><Link href="/login">Resume registration</Link></div>;
  return <SubmitForm onEdit={()=>setError('')} className="stack-form vendor-registration-form" onSubmit={async event=>{
-  event.preventDefault();setBusy(true);setError('');
-  try{const data=Object.fromEntries(new FormData(event.currentTarget));const response=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,plan,consent:data.consent==='on',autopayConsent:data.autopayConsent==='on'})});const result=await response.json();if(!response.ok)throw Error(result.error||'Registration could not start.');setEmail(result.email||String(data.email).trim());setMessage(result.message);setVerificationUrl(result.verificationUrl||'');}
-  catch(error){setError((error as Error).message);}finally{setBusy(false);}
+  event.preventDefault();if(lock.current)return;lock.current=true;setBusy(true);setError('');
+  try{const data=Object.fromEntries(new FormData(event.currentTarget));const result=await authRequest('register',{...data,plan,consent:data.consent==='on',autopayConsent:data.autopayConsent==='on'});setEmail(result.email||String(data.email).trim());setMessage(result.message);setVerificationUrl(result.verificationUrl||'');}
+  catch(error){setError((error as Error).message);}finally{lock.current=false;setBusy(false);}
  }}>
   <fieldset className="registration-edit-fields" disabled={busy}>
   <TrialOffer plan={plan}/>
@@ -26,7 +29,7 @@ export function VendorRegistrationForm(){
   <label className="checkbox"><input name="autopayConsent" type="checkbox" checked={autopayConsent} onChange={event=>setAutopayConsent(event.target.checked)} required/><span>I agree to set up AutoPay for ₹{details.monthlyRupees}/month, including GST, after the two-month trial. I can cancel before the first debit in my vendor studio.</span></label>
   <label className="checkbox"><input name="consent" type="checkbox" required/><span>I accept the <Link href="/terms">Terms & Conditions</Link> and <Link href="/privacy">Privacy Policy</Link>.</span></label>
   <p className="quiet-note">Your vendor account is created only after successful AutoPay authorization. No monthly plan fee is taken during registration. Your payment provider may process a small authorization amount.</p>
-  {error&&<p className="error" role="alert">{error}</p>}
+  {error&&<p className="error" role="alert">{error}</p>}<AuthProgress busy={busy}/>
   <button className="button" disabled={busy}>{busy?'Please wait…':'Verify email and continue'}<ArrowUpRight size={17}/></button>
   <p className="auth-bottom">Already started? <Link href="/login">Log in to continue</Link></p>
   </fieldset>

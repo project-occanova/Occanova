@@ -1,0 +1,1 @@
+export default function LoadingAuth(){return <main id="main" className="container auth-layout"><div className="auth-intro"><h1>Your Occanova account.</h1><p>Opening your account page…</p></div><div className="panel auth-panel" role="status" aria-busy="true"><h2>Please wait a moment.</h2><p>Loading your secure account form.</p></div></main>;}
