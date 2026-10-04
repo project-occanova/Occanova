@@ -3,14 +3,17 @@ import {localPreview,siteUrl} from './config';
 import {subscriptionPlans,type PlanId} from './plans';
 
 const esc=(value:string)=>value.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+export class EmailSendError extends Error{constructor(message:string,public source:'configuration'|'provider'|'transport',public httpStatus?:number){super(message);}}
 
 async function send(to:string|string[],subject:string,html:string,text:string,idempotencyKey?:string){
   const apiKey=process.env.RESEND_API_KEY,from=process.env.EMAIL_FROM;
-  if(!apiKey||!from){if(localPreview())return;throw Error('Email delivery is not configured.');}
-  const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json',...(idempotencyKey?{'Idempotency-Key':idempotencyKey}:{})},body:JSON.stringify({from,to:Array.isArray(to)?to:[to],subject,html,text}),signal:AbortSignal.timeout(10000)});
-  if(!response.ok){const detail=await response.text();console.error('Resend delivery failed',response.status,detail.slice(0,300));throw Error('We could not send the email. Please try again.');}
+  if(!apiKey||!from){if(localPreview())return;throw new EmailSendError('Email delivery is not configured.','configuration');}
+  let response:Response;
+  try{response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json',...(idempotencyKey?{'Idempotency-Key':idempotencyKey}:{})},body:JSON.stringify({from,to:Array.isArray(to)?to:[to],subject,html,text}),signal:AbortSignal.timeout(10000)});}
+  catch{throw new EmailSendError('Resend could not be reached before the request timeout.','transport');}
+  if(!response.ok){console.error('Resend delivery failed with HTTP',response.status);throw new EmailSendError('We could not send the email. Please try again.','provider',response.status);}
   const result=await response.json();
-  if(typeof result.id!=='string'||!result.id)throw Error('Email delivery could not be confirmed. Please try again.');
+  if(typeof result.id!=='string'||!result.id)throw new EmailSendError('Email delivery could not be confirmed. Please try again.','provider',response.status);
   return result.id as string;
 }
 

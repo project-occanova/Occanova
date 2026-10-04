@@ -616,3 +616,25 @@ table{min-width:680px}
 .login-verification-recovery{display:grid;gap:12px;border-top:1px solid var(--line);padding-top:20px}.login-verification-recovery>p{font-size:13px}.login-verification-recovery .quiet-note{margin:0;font-size:12px;line-height:1.7}.login-verification-recovery a{text-decoration:underline}.login-verification-recovery [role=status]{display:grid;gap:12px;font-size:13px;line-height:1.7;overflow-wrap:anywhere}.login-verification-recovery .button{width:100%;min-height:46px;white-space:normal}.vendor-login-flow{gap:18px}
 
 .registration-rollout-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:20px}.registration-rollout-counts>span{padding:14px;background:var(--sage);border:1px solid var(--line);border-radius:5px;font-size:11px;color:var(--muted)}.registration-rollout-counts strong{display:block;color:var(--green);font-size:24px}.registration-rollout-counts+.quiet-note{margin-bottom:16px}@media(max-width:680px){.registration-rollout-counts{grid-template-columns:1fr;gap:8px}.registration-rollout-counts>span{display:flex;align-items:center;gap:12px;padding:10px 14px}.registration-rollout-counts strong{font-size:21px}}
+
+.admin-plan-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.admin-plan-cards>button{min-width:0;padding:18px;text-align:left;border:1px solid var(--line);border-radius:8px;background:var(--white);color:var(--ink);font:inherit;cursor:pointer}
+.admin-plan-cards>button[aria-pressed=true]{background:var(--sage);border-color:var(--green);box-shadow:inset 0 0 0 1px var(--green)}
+.admin-plan-cards>button:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+.admin-plan-cards>button>span{display:block;font-size:12px;font-weight:700;color:var(--green)}
+.admin-plan-cards strong{display:block;font-family:var(--serif);font-size:36px;font-weight:500;line-height:1.4}
+.admin-plan-cards small{font-size:11px;color:var(--muted)}
+.admin-plan-cards>button>div{display:flex;flex-wrap:wrap;gap:4px 10px;border-top:1px solid var(--line);padding-top:10px;margin-top:12px;font-size:10px;color:var(--muted)}
+.admin-plan-toolbar{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1.2fr) auto;align-items:end;gap:12px;margin:20px 0 12px}
+.admin-plan-toolbar label{display:grid;gap:7px;min-width:0;font-size:11px;color:var(--muted)}
+.admin-plan-toolbar input,.admin-plan-toolbar select{width:100%;min-width:0;min-height:44px;margin:0;font-size:12px}
+.admin-plan-toolbar .button{min-height:44px}
+.admin-plan-results{font-size:12px;color:var(--muted);margin-bottom:14px}
+.admin-plan-overview td{overflow-wrap:anywhere}.admin-plan-overview td .button{margin-top:10px}
+.admin-plan-overview .admin-billing-state{font-size:12px;color:var(--green)}.admin-plan-overview .admin-billing-state.attention,.admin-plan-overview .admin-billing-state.ended{color:#895422}
+.admin-plan-pagination{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:18px;font-size:12px}.admin-plan-pagination .button{min-height:44px}
+@media(max-width:1100px){.admin-plan-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-plan-toolbar{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:680px){.admin-plan-cards{gap:8px}.admin-plan-cards>button{padding:14px}.admin-plan-cards strong{font-size:30px}.admin-plan-cards>button>div{display:grid;gap:3px}.admin-plan-toolbar{grid-template-columns:1fr;gap:10px}.admin-plan-pagination{gap:8px;font-size:10px}.admin-plan-pagination .button{padding:10px 12px}.admin-plan-overview td>strong,.admin-plan-overview td>small,.admin-plan-overview td>span,.admin-plan-overview td>.button{grid-column:2;min-width:0}}
+@media(max-width:360px){.admin-plan-cards>button{padding:11px}}
+.verification-delivery-check{display:grid;justify-items:start;gap:6px;margin-top:8px}.verification-delivery-check small{line-height:1.5;max-width:450px;overflow-wrap:anywhere}
+@media(max-width:680px){#registrations .verification-delivery-check{grid-column:1/-1;width:100%;justify-items:stretch}#registrations .verification-delivery-check .button{width:100%}}

@@ -27,6 +27,7 @@ export function Workspace({admin=false,children,email}:{admin?:boolean;children:
     {href:`${base}#enquiries`,label:'Enquiries',icon:Mail},
   ];
   const manage:WorkspaceItem[]=admin?[
+    {href:`${base}#subscriptions`,label:'Plans & vendors',icon:CreditCard},
     {href:`${base}#taxonomy`,label:'Categories & locations',icon:Layers},
     {href:`${base}#activity`,label:'Activity log',icon:ClipboardList},
     {href:`${base}#account`,label:'Account',icon:Settings2},
@@ -40,14 +41,14 @@ export function Workspace({admin=false,children,email}:{admin?:boolean;children:
         <div className="sidebar-nav-group"><span>Workspace</span><nav aria-label="Workspace navigation"><WorkspaceLinks items={primary} markFirst/></nav></div>
         <div className="sidebar-nav-group"><span>{admin?'Manage':'Settings'}</span><nav aria-label={admin?'Management navigation':'Account navigation'}><WorkspaceLinks items={manage}/></nav></div>
       </div>
-      <div className="sidebar-bottom"><Link href="/">Visit website<ArrowUpRight size={16}/></Link><Logout redirectTo={admin?'/admin/login':'/login'}/></div>
+      <div className="sidebar-bottom"><Link prefetch={false} href="/">Visit website<ArrowUpRight size={16}/></Link><Logout redirectTo={admin?'/admin/login':'/login'}/></div>
     </aside>
 
     <div className="workspace-content">
       <header className="workspace-header"><span>{admin?'Occanova administration':'Manage your business'}</span><span>{email}</span></header>
       <header className="workspace-mobile-header">
         <Link href={base} className="workspace-mobile-brand">OCCANOVA<small>{admin?'ADMIN STUDIO':'VENDOR STUDIO'}</small></Link>
-        <WorkspaceMenu><nav aria-label="Mobile workspace navigation"><WorkspaceLinks items={[...primary,...manage]}/></nav><Link className="workspace-visit" href="/">Visit website<ArrowUpRight size={15}/></Link><Logout redirectTo={admin?'/admin/login':'/login'}/></WorkspaceMenu>
+        <WorkspaceMenu><nav aria-label="Mobile workspace navigation"><WorkspaceLinks items={[...primary,...manage]}/></nav><Link prefetch={false} className="workspace-visit" href="/">Visit website<ArrowUpRight size={15}/></Link><Logout redirectTo={admin?'/admin/login':'/login'}/></WorkspaceMenu>
       </header>
       <main id="main" className="workspace-main">{children}</main>
       <nav className="workspace-mobile-nav" aria-label="Primary workspace navigation"><WorkspaceLinks items={mobile} markFirst/></nav>

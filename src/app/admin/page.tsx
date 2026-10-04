@@ -10,6 +10,9 @@ import {workspaceVersion} from '@/lib/workspace-version';
 import {reviewLabels} from '@/lib/review-labels';
 import {subscriptionPlans} from '@/lib/plans';
 import {registrationRecoveryExpiry} from '@/lib/email-verification';
+import {adminPlanReport} from '@/lib/admin-plans';
+import {AdminPlans} from '@/components/admin-plans';
+import {VerificationDeliveryCheck} from '@/components/verification-delivery-check';
 
 export const dynamic='force-dynamic';
 
@@ -19,6 +22,7 @@ export default async function Admin({searchParams}:{searchParams:Promise<Record<
   if(user.role!=='admin')redirect('/dashboard');
   const s=await readState();
   const p=await searchParams;
+  const planReport=adminPlanReport(s);
   const filtered=s.vendors.filter(v=>(!p.q||`${v.name} ${v.service}`.toLowerCase().includes(p.q.toLowerCase()))&&(!p.status||v.status===p.status)&&(!p.category||v.category===p.category)&&(!p.service||v.service===p.service)&&(!p.city||v.city===p.city));
   const visible=publicVendors(s.vendors,{},s.users);const visibleIds=new Set(visible.map(vendor=>vendor.id));
   const pending=s.vendors.filter(x=>x.status==='pending').sort((a,b)=>(a.submittedAt||'').localeCompare(b.submittedAt||''));
@@ -33,7 +37,7 @@ export default async function Admin({searchParams}:{searchParams:Promise<Record<
 
     <WorkspaceLiveUpdates admin version={workspaceVersion(s,user)}/>
     <div className="stat-grid workspace-stats admin-stats">
-      <div><span>Total vendors</span><strong>{s.vendors.length}</strong></div>
+      <div><a href="#subscriptions"><span>Vendor accounts</span><strong>{planReport.rows.length}</strong><small>View plans & vendors →</small></a></div>
       <div><Link href="/admin?status=pending#vendors"><span>Pending review</span><strong>{pending.length}</strong><small>Open review queue →</small></Link></div>
       <div><span>Public profiles</span><strong>{visible.length}</strong></div>
       <div><span>Total enquiries</span><strong>{s.enquiries.length}</strong></div>
@@ -44,10 +48,12 @@ export default async function Admin({searchParams}:{searchParams:Promise<Record<
       {pending.length?<div className="attention-list">{pending.slice(0,5).map(v=><article key={v.id}><div><strong>{v.name}</strong><span>{v.category} · {v.city}</span>{v.submittedAt&&<small>Submitted {new Date(v.submittedAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',timeZone:'Asia/Kolkata'})}</small>}</div><span className="status pending">Pending review</span><Link className="button small" href={'/admin/vendors/'+v.id}>Review</Link></article>)}</div>:<div className="empty-state compact"><h3>You’re all caught up.</h3><p>New submissions will appear here for review.</p></div>}
     </section>
 
+    <AdminPlans report={planReport}/>
+
     <section id="registrations" className="panel workspace-section" aria-labelledby="registration-progress-heading">
       <div className="workspace-section-heading"><div><h2 id="registration-progress-heading">Registration progress</h2><p>Accounts activate after email verification and AutoPay authorization. Profile review happens afterwards.</p></div><span>{registrations.length} in progress</span></div>
       <div className="registration-rollout-counts"><span><strong>{registrations.filter(row=>!row.verified).length}</strong> Awaiting email verification</span><span><strong>{registrations.filter(row=>row.verified).length}</strong> Awaiting AutoPay setup</span><span><strong>{awaitingProfiles.length}</strong> Accounts awaiting a profile</span></div>
-      {registrations.length?<><p className="quiet-note">Latest {Math.min(10,registrations.length)} registrations. Vendors can use Log in to resume setup or Resend verification email. AutoPay authorization cannot be bypassed by an administrator.</p><div className="table-wrap responsive-table"><table><thead><tr><th>Vendor contact</th><th>Plan</th><th>Next step</th><th>Latest step</th></tr></thead><tbody>{registrations.slice(0,10).map(row=><tr key={row.id}><td data-label="Contact"><strong>{row.email}</strong><small>{row.phone}</small></td><td data-label="Plan">{subscriptionPlans[row.plan].name}<small>₹{subscriptionPlans[row.plan].monthlyRupees}/month · GST included</small></td><td data-label="Next step">{!row.verified?'Verify email':row.subscription?.gatewayId?'Finish or check AutoPay authorization':'Set up AutoPay'}{row.subscription&&<small>Mandate: {row.subscription.status}</small>}{row.verificationEmail&&<small>{row.verificationEmail.status==='accepted'?'Verification email accepted by Resend':'Verification email failed'} · {new Date(row.verificationEmail.attemptedAt).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})}{row.verificationEmail.providerId&&<span> · Reference: {row.verificationEmail.providerId}</span>}</small>}</td><td data-label="Latest step">{new Date(row.autopayConsentAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Kolkata'})}</td></tr>)}</tbody></table></div></>:<div className="empty-state compact"><h3>No unfinished registrations.</h3><p>New signups will appear here until their accounts activate.</p></div>}
+      {registrations.length?<><p className="quiet-note">Latest {Math.min(10,registrations.length)} registrations. Vendors can use Log in to resume setup or Resend verification email. AutoPay authorization cannot be bypassed by an administrator.</p><div className="table-wrap responsive-table"><table><thead><tr><th>Vendor contact</th><th>Plan</th><th>Next step</th><th>Latest step</th></tr></thead><tbody>{registrations.slice(0,10).map(row=><tr key={row.id}><td data-label="Contact"><strong>{row.email}</strong><small>{row.phone}</small></td><td data-label="Plan">{subscriptionPlans[row.plan].name}<small>₹{subscriptionPlans[row.plan].monthlyRupees}/month · GST included</small></td><td data-label="Next step">{!row.verified?'Verify email':row.subscription?.gatewayId?'Finish or check AutoPay authorization':'Set up AutoPay'}{row.subscription&&<small>Mandate: {row.subscription.status}</small>}{row.verificationEmail&&<small>{row.verificationEmail.status==='accepted'?'Verification email accepted by Resend (delivery not yet checked)':'Verification email send failed'} · {new Date(row.verificationEmail.attemptedAt).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})}{row.verificationEmail.providerId&&<span> · Reference: {row.verificationEmail.providerId}</span>}</small>}{!row.verified&&row.verificationEmail&&<VerificationDeliveryCheck registrationId={row.id}/>}</td><td data-label="Latest step">{new Date(row.autopayConsentAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Kolkata'})}</td></tr>)}</tbody></table></div></>:<div className="empty-state compact"><h3>No unfinished registrations.</h3><p>New signups will appear here until their accounts activate.</p></div>}
     </section>
 
     <section id="vendors" className="panel workspace-section">
