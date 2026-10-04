@@ -7,15 +7,16 @@ import {TrialOffer} from './trial-offer';
 import {SubmitForm} from './submit-form';
 import {authRequest} from '@/lib/auth-request';
 import {AuthProgress} from './auth-progress';
+import {EmailInboxReminder} from './email-inbox-reminder';
 
 export function VendorRegistrationForm(){
  const lock=useRef(false);
- const[plan,setPlan]=useState<PlanId>('starter'),[autopayConsent,setAutopayConsent]=useState(false),[busy,setBusy]=useState(false),[show,setShow]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[verificationUrl,setVerificationUrl]=useState(''),[email,setEmail]=useState('');
+ const[plan,setPlan]=useState<PlanId>('starter'),[autopayConsent,setAutopayConsent]=useState(false),[busy,setBusy]=useState(false),[show,setShow]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[verificationUrl,setVerificationUrl]=useState(''),[email,setEmail]=useState(''),[emailAccepted,setEmailAccepted]=useState(false);
  const details=subscriptionPlans[plan];
- if(message)return <div className="success-state" role="status"><h3>Verify your email next.</h3><p>{message}</p><p><strong>{email}</strong></p>{verificationUrl?<Link className="button" href={verificationUrl}>Verify email and continue</Link>:<p>Check your inbox and spam folder for the verification link to set up AutoPay.</p>}<Link href={'/resend-verification?email='+encodeURIComponent(email)}>Resend verification email</Link><Link href="/login">Resume registration</Link></div>;
+ if(message)return <div className="success-state" role="status"><h3>Verify your email next.</h3><p>{message}</p><p><strong>{email}</strong></p>{emailAccepted&&<EmailInboxReminder/>}{verificationUrl?<Link className="button" href={verificationUrl}>Verify email and continue</Link>:!emailAccepted&&<p>If your verification email could not be sent, request a new link below.</p>}<Link href={'/resend-verification?email='+encodeURIComponent(email)}>Resend verification email</Link><Link href="/login">Resume registration</Link></div>;
  return <SubmitForm onEdit={()=>setError('')} className="stack-form vendor-registration-form" onSubmit={async event=>{
   event.preventDefault();if(lock.current)return;lock.current=true;setBusy(true);setError('');
-  try{const data=Object.fromEntries(new FormData(event.currentTarget));const result=await authRequest('register',{...data,plan,consent:data.consent==='on',autopayConsent:data.autopayConsent==='on'});setEmail(result.email||String(data.email).trim());setMessage(result.message);setVerificationUrl(result.verificationUrl||'');}
+  try{const data=Object.fromEntries(new FormData(event.currentTarget));const result=await authRequest('register',{...data,plan,consent:data.consent==='on',autopayConsent:data.autopayConsent==='on'});setEmail(result.email||String(data.email).trim());setMessage(result.message);setVerificationUrl(result.verificationUrl||'');setEmailAccepted(result.emailDelivery==='sent');}
   catch(error){setError((error as Error).message);}finally{lock.current=false;setBusy(false);}
  }}>
   <fieldset className="registration-edit-fields" disabled={busy}>

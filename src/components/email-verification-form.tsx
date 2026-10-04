@@ -6,6 +6,7 @@ import {CheckCircle2,Mail} from 'lucide-react';
 import {SubmitForm} from './submit-form';
 import {authRequest as request} from '@/lib/auth-request';
 import {AuthProgress} from './auth-progress';
+import {EmailInboxReminder} from './email-inbox-reminder';
 
 export function EmailVerificationForm({mode,token,initialEmail=''}:{mode:'verify'|'resend';token?:string;initialEmail?:string}){
  const router=useRouter();const lock=useRef(false);
@@ -28,6 +29,7 @@ export function EmailVerificationForm({mode,token,initialEmail=''}:{mode:'verify
   {!verified&&<section className="verification-recovery" aria-labelledby={mode==='verify'?'verification-recovery-title':undefined} aria-label={mode==='resend'?'Request verification link':undefined}>
    {mode==='verify'&&<h3 id="verification-recovery-title">Need a new verification link?</h3>}
    <p>Expired link or no email? Enter the email address you used to register. You can request a new link without starting again.</p>
+   <EmailInboxReminder/>
    <SubmitForm className="stack-form" onEdit={()=>{setResendError('');setSent('');setPreview('');setOutcome('');}} onSubmit={async event=>{
     event.preventDefault();if(lock.current)return;
     const email=String(new FormData(event.currentTarget).get('email')||'').trim();

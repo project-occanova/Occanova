@@ -6,6 +6,7 @@ import {ArrowUpRight,Eye,EyeOff,Mail} from 'lucide-react';
 import {authRequest} from '@/lib/auth-request';
 import {SubmitForm} from './submit-form';
 import {AuthProgress} from './auth-progress';
+import {EmailInboxReminder} from './email-inbox-reminder';
 
 export function VendorLoginForm({initialEmail=''}:{initialEmail?:string}){
  const router=useRouter(),lock=useRef(false),password=useRef<HTMLInputElement>(null);
@@ -33,6 +34,7 @@ export function VendorLoginForm({initialEmail=''}:{initialEmail?:string}){
   {error&&<p className="error" role="alert">{error}</p>}
   <div className="login-verification-recovery">
    <p>Waiting for email verification?</p>
+   <EmailInboxReminder/>
    <button className="button outline" type="button" disabled={Boolean(busy)} onClick={resend}>{busy==='resend'?'Sending…':'Resend verification email'}<Mail size={17}/></button>
    {recovery&&<div className={['not_found','registration_expired'].includes(recovery.status)?'notice':'success'} role="status"><p>{recovery.message}</p>{recovery.status==='already_verified'&&<button className="button outline" type="button" onClick={()=>password.current?.focus()}>Continue with login</button>}{['not_found','registration_expired'].includes(recovery.status)&&<Link href="/register">Start vendor registration</Link>}{recovery.verificationUrl&&<Link href={recovery.verificationUrl}>Open verification link</Link>}</div>}
    <p className="quiet-note">Use the email address you registered with. For help, <a href="mailto:info@occanova.com">contact Occanova support</a>.</p>
