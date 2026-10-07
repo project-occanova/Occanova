@@ -1,6 +1,10 @@
 import {createHmac} from 'node:crypto';
 import {hasMobileOtp} from './config';
 
+export class MobileOtpDeliveryError extends Error{
+  constructor(){super('The verification message could not be sent. Please try again shortly.');}
+}
+
 export function normalizeIndianMobile(value:string){
   const digits=value.replace(/\D/g,'');
   const national=digits.length===10?digits:digits.length===12&&digits.startsWith('91')?digits.slice(2):'';
@@ -15,16 +19,15 @@ export function mobileOtpHash(userId:string,phone:string,code:string){
 
 export async function sendMobileOtp(phone:string,code:string){
   if(!hasMobileOtp())throw Error('Mobile verification is not configured yet.');
+  const mobile=normalizeIndianMobile(phone);
+  if(!mobile||!/^\d{6}$/.test(code))throw Error('Invalid mobile verification request.');
   let response:Response;
   try{
-    response=await fetch('https://2factor.in/API/V1/OTP/SEND',{
-      method:'POST',
-      headers:{'X-API-Key':process.env.TWOFACTOR_API_KEY!,'Content-Type':'application/json'},
-      body:JSON.stringify({to:phone,template_name:process.env.TWOFACTOR_TEMPLATE_NAME,var1:code}),
-      signal:AbortSignal.timeout(12_000),
-    });
-  }catch{throw Error('The verification message could not be sent. Please try again.');}
+    const key=encodeURIComponent(process.env.TWOFACTOR_API_KEY!);
+    const template=encodeURIComponent(process.env.TWOFACTOR_TEMPLATE_NAME!);
+    response=await fetch(`https://2factor.in/API/V1/${key}/SMS/${mobile}/${code}/${template}`,{signal:AbortSignal.timeout(12_000)});
+  }catch{throw new MobileOtpDeliveryError();}
   const result=await response.json().catch(()=>({})) as {status?:string;Status?:string};
   const status=(result.status??result.Status??'').toLowerCase();
-  if(!response.ok||!['sent','success'].includes(status))throw Error('The verification message could not be sent. Please try again.');
+  if(!response.ok||!['sent','success'].includes(status))throw new MobileOtpDeliveryError();
 }

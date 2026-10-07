@@ -5,7 +5,7 @@ import type {ClientSession} from 'mongodb';
 import {mongo,mongoConfigured} from './db';
 import {initialState} from './seed';
 import {normalizeCategories,normalizeVendorTaxonomy} from './taxonomy';
-import type {State} from './types';
+import type {State,User,Vendor} from './types';
 import {registrationRecoveryExpiry} from './email-verification';
 
 const file=process.env.VERCEL!=='1'&&process.env.OCCANOVA_PREVIEW_FILE?path.resolve(process.env.OCCANOVA_PREVIEW_FILE):path.join(process.cwd(),'data','preview.json');
@@ -122,6 +122,34 @@ async function ensureMongoSeed(){
 export const readState=cache(async():Promise<State>=>{
   if(!mongoConfigured())return localRead();
   await ensureMongoSeed();return mongoRead();
+});
+
+type PublicDirectoryState=Pick<State,'vendors'|'categories'|'locations'>&{users:Pick<User,'id'|'subscription'>[]};
+
+// Public discovery never needs account credentials, sessions, or private workflow records.
+export const readPublicDirectory=cache(async():Promise<PublicDirectoryState>=>{
+  if(!mongoConfigured()){
+    const state=await localRead();
+    return {vendors:state.vendors.filter(v=>v.status==='approved'&&v.published),users:state.users.map(({id,subscription})=>({id,subscription})),categories:state.categories,locations:state.locations};
+  }
+  await ensureMongoSeed();
+  const {db}=await mongo();
+  const [vendorDocs,userDocs,categoryDocs,locationDocs]=await Promise.all([
+    db.collection<MongoDoc>('vendors').find({status:'approved',published:true},{projection:{documents:0,remarks:0}}).toArray(),
+    db.collection<MongoDoc>('users').find({},{projection:{_id:0,id:1,subscription:1}}).toArray(),
+    db.collection<MongoDoc>('categories').find({}).sort({_order:1}).toArray(),
+    db.collection<MongoDoc>('locations').find({}).sort({_order:1}).toArray(),
+  ]);
+  const categories=normalizeCategories(categoryDocs.map(clean<State['categories'][number]>));
+  const incomingLocations=locationDocs.map(clean<State['locations'][number]>);
+  const seededLocations=initialState().locations;
+  const seededSlugs=new Set(seededLocations.map(x=>x.slug));
+  return {
+    vendors:vendorDocs.map(clean<Vendor>).map(v=>({...normalizeVendorTaxonomy(v,categories),documents:[]})),
+    users:userDocs.map(clean<Pick<User,'id'|'subscription'>>),
+    categories,
+    locations:[...seededLocations.map(base=>({...base,...incomingLocations.find(x=>x.slug===base.slug),name:base.name,slug:base.slug})),...incomingLocations.filter(x=>!seededSlugs.has(x.slug))],
+  };
 });
 
 async function mongoMutate<T>(fn:(state:State)=>T|Promise<T>){

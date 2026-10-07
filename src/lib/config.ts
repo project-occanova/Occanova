@@ -6,7 +6,7 @@ export const hasMobileOtp=()=>Boolean(process.env.TWOFACTOR_API_KEY&&process.env
 export const backendReady=()=>hasDatabase();
 export const siteIndexable=()=>process.env.SITE_INDEXABLE==='true';
 export const localPreview=()=>process.env.VERCEL!=='1'&&(process.env.LOCAL_PREVIEW==='true'||process.env.NODE_ENV!=='production');
-export const mobileOtpEnabled=()=>process.env.MOBILE_OTP_ENABLED==='true'&&hasMobileOtp();
+export const mobileOtpEnabled=()=>localPreview()||(process.env.MOBILE_OTP_ENABLED==='true'&&hasMobileOtp());
 export const publicIntakeEnabled=()=>localPreview()||(backendReady()&&hasEmail()&&process.env.PUBLIC_INTAKE_ENABLED==='true');
 export function siteUrl(){
   const vercelHost=process.env.VERCEL_PROJECT_PRODUCTION_URL||process.env.VERCEL_URL;

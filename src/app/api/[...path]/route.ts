@@ -2,7 +2,7 @@ import { NextRequest,NextResponse,after } from 'next/server';
 import { randomInt,randomUUID } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
-import { mutate,readState } from '@/lib/store';
+import { mutate,readPublicDirectory,readState } from '@/lib/store';
 import { currentUser,hashPassword,checkPassword,token,digest,cookieOptions,portalAllowed } from '@/lib/auth';
 import { registerSchema,enquirySchema,profileSchema,draftProfileSchema,adminVendorProfileSchema,vendorLifecycleSchema } from '@/lib/validation';
 import { slugify,publicVendors,publicVendorProfile } from '@/lib/directory';
@@ -10,7 +10,7 @@ import {backendReady,hasDatabase,hasEmail,hasMobileOtp,hasStorage,localPreview,m
 import {rateLimited} from '@/lib/rate-limit';
 import {EmailSendError,sendEnquiryNotifications,sendResetEmail,sendVerificationEmail} from '@/lib/email';
 import {cleanupOrphanedUploads,createDownload,deleteUploads,validVendorKey,vendorStorageKeys} from '@/lib/storage';
-import {mobileOtpHash,normalizeIndianMobile,sendMobileOtp} from '@/lib/mobile-otp';
+import {MobileOtpDeliveryError,mobileOtpHash,normalizeIndianMobile,sendMobileOtp} from '@/lib/mobile-otp';
 import {billingEnabled,billingMode} from '@/lib/subscriptions';
 import {assertPlanAccess,assertPortfolioLimit,PlanAccessError} from '@/lib/plan-access';
 import {startRegistration} from '@/lib/registration';
@@ -25,7 +25,7 @@ export const runtime='nodejs';
 const fail=(message:string,status=400)=>NextResponse.json({error:message},{status});
 export async function GET(req:NextRequest,{params}:{params:Promise<{path:string[]}>}) {
  const route=(await params).path.join('/');
- if(route==='health')return NextResponse.json({ok:true,database:hasDatabase(),email:hasEmail(),mobileOtp:hasMobileOtp(),subscriptions:billingEnabled(),billingMode:billingMode(),storage:hasStorage(),writable:backendReady()&&!readOnlyDeployment(),intake:publicIntakeEnabled()});
+ if(route==='health')return NextResponse.json({ok:true,database:hasDatabase(),email:hasEmail(),mobileOtp:hasMobileOtp(),mobileOtpEnabled:mobileOtpEnabled(),subscriptions:billingEnabled(),billingMode:billingMode(),storage:hasStorage(),writable:backendReady()&&!readOnlyDeployment(),intake:publicIntakeEnabled()});
  if(route==='workspace-status'){
   const value=(await cookies()).get('occanova_session')?.value;if(!value)return fail('Please sign in.',401);
   const state=await readState();const session=state.sessions.find(row=>row.hash===digest(value)&&row.expires>Date.now());const user=state.users.find(row=>row.id===session?.userId);
@@ -40,6 +40,10 @@ export async function GET(req:NextRequest,{params}:{params:Promise<{path:string[
   return NextResponse.json({ok:true,...await cleanupOrphanedUploads(referenced,new Date(Date.now()-24*60*60*1000))});
  }
  if(!['media','vendors'].includes(route))return fail('Not found',404);
+ if(route==='vendors'){
+  const s=await readPublicDirectory();
+  return NextResponse.json(publicVendors(s.vendors,Object.fromEntries(req.nextUrl.searchParams),s.users).map(publicVendorProfile));
+ }
  const s=await readState();
  if(route==='media'){
   if(!hasStorage())return fail('Private file storage is not configured.',503);
@@ -49,7 +53,6 @@ export async function GET(req:NextRequest,{params}:{params:Promise<{path:string[
   const path=`/api/media?key=${encodeURIComponent(key)}`;if(!privileged&&!(vendor&&publicVendors([vendor],{},s.users).length&&(vendor.image===path||vendor.gallery.includes(path))))return fail('File not found',404);
   const response=NextResponse.redirect(await createDownload(key),302);response.headers.set('Cache-Control','private, no-store');return response;
  }
- if(route==='vendors')return NextResponse.json(publicVendors(s.vendors,Object.fromEntries(req.nextUrl.searchParams),s.users).map(publicVendorProfile));
  return fail('Not found',404);
 }
 export async function POST(req:NextRequest,{params}:{params:Promise<{path:string[]}>}) {
@@ -148,9 +151,9 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
   if(route==='auth/mobile/send'){
    if(user.role!=='vendor')return fail('Vendor access required',403);
    if(user.phoneVerified)return NextResponse.json({ok:true,verified:true,message:'Your mobile number is already verified.'});
-   if(await rateLimited(`mobile-send:${user.id}`,3,10*60*1000))return fail('Too many verification requests. Please wait 10 minutes and try again.',429);
    const phone=normalizeIndianMobile(user.phone);if(!phone)return fail('Your account does not have a valid Indian mobile number.',400);
    if(!mobileOtpEnabled())return fail('Mobile verification is not configured yet.',503);
+   if(await rateLimited(`mobile-send:${user.id}`,3,10*60*1000))return fail('Too many verification requests. Please wait 10 minutes and try again.',429);
    if(await rateLimited(`mobile-phone:${phone}`,5,60*60*1000))return fail('Too many verification requests for this number. Please try again in an hour.',429);
    const code=String(randomInt(100000,1000000));
    const hash=mobileOtpHash(user.id,phone,code);
@@ -164,10 +167,10 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
   if(route==='auth/mobile/verify'){
    if(user.role!=='vendor')return fail('Vendor access required',403);
    if(user.phoneVerified)return NextResponse.json({ok:true,verified:true,message:'Your mobile number is already verified.'});
-   if(await rateLimited(`mobile-check:${user.id}`,5,10*60*1000))return fail('Too many incorrect attempts. Please wait 10 minutes and request a new code.',429);
    const code=z.string().regex(/^\d{6}$/,'Enter the six-digit verification code.').parse(b.code);
    const phone=normalizeIndianMobile(user.phone);if(!phone)return fail('Your account does not have a valid Indian mobile number.',400);
    if(!mobileOtpEnabled())return fail('Mobile verification is not configured yet.',503);
+   if(await rateLimited(`mobile-check:${user.id}`,5,10*60*1000))return fail('Too many incorrect attempts. Please wait 10 minutes and request a new code.',429);
    const approved=await mutate(s=>{
     const hash=mobileOtpHash(user.id,phone,code);
     if(!s.tokens.some(x=>x.userId===user.id&&x.kind==='mobile'&&x.hash===hash&&x.expires>Date.now()))return false;
@@ -238,6 +241,7 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
   if(route==='admin/subcategory'){const v=z.object({category:z.string().min(2).max(80),name:z.string().trim().min(2).max(100)}).parse(b);await mutate(s=>{const category=s.categories.find(x=>x.slug===v.category);if(!category)throw Error('Choose an active category.');if(category.services?.some(name=>slugify(name)===slugify(v.name)))throw Error('This subcategory already exists.');category.services=[...(category.services??[]),v.name];s.audit.unshift({id:randomUUID(),actor:user.email,action:'Subcategory added',target:category.name,remarks:v.name,at:new Date().toISOString()});});return NextResponse.json({ok:true});}
   return fail('Not found',404);
  }catch(e){
+  if(e instanceof MobileOtpDeliveryError)return fail(e.message,503);
   if(e instanceof PlanAccessError)return fail(e.message,e.status);
   if(e instanceof z.ZodError)return fail(e.issues[0]?validationFeedback(e.issues[0]):'Check the form fields');
   if(e instanceof SyntaxError)return fail('Invalid JSON');

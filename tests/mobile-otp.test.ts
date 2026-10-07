@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mobileOtpHash,normalizeIndianMobile,sendMobileOtp} from '../src/lib/mobile-otp';
-import {hasMobileOtp} from '../src/lib/config';
+import {MobileOtpDeliveryError,mobileOtpHash,normalizeIndianMobile,sendMobileOtp} from '../src/lib/mobile-otp';
+import {hasMobileOtp,mobileOtpEnabled} from '../src/lib/config';
 import {registerSchema} from '../src/lib/validation';
 
 test('Indian vendor mobile numbers are stored in E.164 format',()=>{
@@ -18,19 +18,33 @@ test('2Factor sends the one-time code with the approved template',async()=>{
     process.env.TWOFACTOR_API_KEY='test-api-key';process.env.TWOFACTOR_TEMPLATE_NAME='OCCANOVA_OTP';
     assert.equal(hasMobileOtp(),true);
     globalThis.fetch=(async(input,init)=>{
-      assert.equal(input,'https://2factor.in/API/V1/OTP/SEND');
-      assert.equal(init?.method,'POST');
-      assert.equal((init?.headers as Record<string,string>)['X-API-Key'],'test-api-key');
-      assert.deepEqual(JSON.parse(String(init?.body)),{to:'+919876543210',template_name:'OCCANOVA_OTP',var1:'123456'});
-      return Response.json({status:'sent',session_id:'test-session'});
+      assert.equal(input,'https://2factor.in/API/V1/test-api-key/SMS/+919876543210/123456/OCCANOVA_OTP');
+      assert.equal(init?.method,undefined);
+      return Response.json({Status:'Success',Details:'test-session'});
     }) as typeof fetch;
     await sendMobileOtp('+919876543210','123456');
     globalThis.fetch=(async()=>Response.json({status:'failed'},{status:400})) as typeof fetch;
-    await assert.rejects(sendMobileOtp('+919876543210','123456'),/could not be sent/);
+    await assert.rejects(sendMobileOtp('+919876543210','123456'),MobileOtpDeliveryError);
   }finally{
     globalThis.fetch=original.fetch;
     if(original.key===undefined)delete process.env.TWOFACTOR_API_KEY;else process.env.TWOFACTOR_API_KEY=original.key;
     if(original.template===undefined)delete process.env.TWOFACTOR_TEMPLATE_NAME;else process.env.TWOFACTOR_TEMPLATE_NAME=original.template;
+  }
+});
+
+test('mobile verification can be exercised in local preview without SMS credentials, but production stays gated',()=>{
+  const original={preview:process.env.LOCAL_PREVIEW,vercel:process.env.VERCEL,key:process.env.TWOFACTOR_API_KEY,template:process.env.TWOFACTOR_TEMPLATE_NAME,enabled:process.env.MOBILE_OTP_ENABLED};
+  try{
+    process.env.LOCAL_PREVIEW='true';delete process.env.VERCEL;delete process.env.TWOFACTOR_API_KEY;delete process.env.TWOFACTOR_TEMPLATE_NAME;delete process.env.MOBILE_OTP_ENABLED;
+    assert.equal(mobileOtpEnabled(),true);
+    process.env.VERCEL='1';
+    assert.equal(mobileOtpEnabled(),false);
+    process.env.TWOFACTOR_API_KEY='test-api-key';process.env.TWOFACTOR_TEMPLATE_NAME='OCCANOVA_OTP';process.env.MOBILE_OTP_ENABLED='true';
+    assert.equal(mobileOtpEnabled(),true);
+  }finally{
+    for(const [key,value] of Object.entries({LOCAL_PREVIEW:original.preview,VERCEL:original.vercel,TWOFACTOR_API_KEY:original.key,TWOFACTOR_TEMPLATE_NAME:original.template,MOBILE_OTP_ENABLED:original.enabled})){
+      if(value===undefined)delete process.env[key];else process.env[key]=value;
+    }
   }
 });
 

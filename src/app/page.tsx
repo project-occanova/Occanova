@@ -2,7 +2,7 @@ import Link from 'next/link';
 import {ArrowUpRight,ArrowRight} from 'lucide-react';
 import {Header,Footer,SearchForm,VendorCard,PreviewNotice} from '@/components/ui';
 import {categoryIconFor} from '@/components/category-icons';
-import {readState} from '@/lib/store';
+import {readPublicDirectory} from '@/lib/store';
 import {publicVendors,isFeatured} from '@/lib/directory';
 import {photos} from '@/lib/seed';
 
@@ -10,7 +10,7 @@ import {photos} from '@/lib/seed';
 export const revalidate=60;
 
 export default async function Home(){
-  const s=await readState();
+  const s=await readPublicDirectory();
   const featured=publicVendors(s.vendors,{},s.users).filter(v=>isFeatured(v)).slice(0,3);
   return <>
     <Header/>

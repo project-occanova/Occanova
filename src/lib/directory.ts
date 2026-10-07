@@ -4,8 +4,8 @@ export {slugify} from './slugs';
 import {categoryName,serviceName} from './taxonomy';
 import {listingWithinPlan} from './plan-access';
 export function isFeatured(v:Vendor, now=Date.now()) { return v.featured && (!v.featuredStart || Date.parse(v.featuredStart)<=now) && (!v.featuredEnd || Date.parse(v.featuredEnd+'T23:59:59.999Z')>=now); }
-export function isPublicVendor(v:Vendor,owner?:User){return v.status==='approved'&&v.published&&(v.sample||listingWithinPlan(owner?.subscription,v.gallery.length));}
-export function publicVendors(vendors:Vendor[], filter:{category?:string; service?:string; city?:string; q?:string}={},users:User[]=[]){
+export function isPublicVendor(v:Vendor,owner?:Pick<User,'id'|'subscription'>){return v.status==='approved'&&v.published&&(v.sample||listingWithinPlan(owner?.subscription,v.gallery.length));}
+export function publicVendors(vendors:Vendor[], filter:{category?:string; service?:string; city?:string; q?:string}={},users:Pick<User,'id'|'subscription'>[]=[]){
   filter={...filter,category:filter.category?categoryName(filter.category):undefined,service:filter.service?serviceName(filter.category||'',filter.service):undefined};
   const accounts=new Map(users.map(user=>[user.id,user]));
   return vendors.filter(v=>isPublicVendor(v,accounts.get(v.userId)) && (!filter.category || slugify(v.category)===slugify(filter.category)) && (!filter.service || slugify(v.service||'')===slugify(filter.service)) && (!filter.city || v.locations.some(l=>slugify(l)===slugify(filter.city!)||slugify(l)==='pan-india')) && (!filter.q || `${v.name} ${v.summary} ${v.category} ${v.service||''}`.toLowerCase().includes(filter.q.toLowerCase().trim())))

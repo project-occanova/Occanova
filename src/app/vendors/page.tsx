@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {ChevronDown,SlidersHorizontal} from 'lucide-react';
 import {Header,Footer,SearchForm,VendorCard,PreviewNotice} from '@/components/ui';
-import {readState} from '@/lib/store';
+import {readPublicDirectory} from '@/lib/store';
 import {publicVendors} from '@/lib/directory';
 import type {Taxon} from '@/lib/types';
 
@@ -15,7 +15,7 @@ function FilterControls(props:FilterControlsProps){
 
 export default async function Directory({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){
   const p=await searchParams;
-  const s=await readState();
+  const s=await readPublicDirectory();
   const rows=publicVendors(s.vendors,p,s.users);
   const pages=Math.max(1,Math.ceil(rows.length/6));
   const page=Math.min(pages,Math.max(1,Math.floor(Number(p.page))||1));
