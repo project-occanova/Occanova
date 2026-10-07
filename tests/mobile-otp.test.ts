@@ -23,6 +23,13 @@ test('2Factor sends the one-time code with the approved template',async()=>{
       return Response.json({Status:'Success',Details:'test-session'});
     }) as typeof fetch;
     await sendMobileOtp('+919876543210','123456');
+    delete process.env.TWOFACTOR_TEMPLATE_NAME;
+    globalThis.fetch=(async(input)=>{
+      assert.equal(input,'https://2factor.in/API/V1/test-api-key/SMS/+919876543210/123456');
+      return Response.json({Status:'Success',Details:'default-template-session'});
+    }) as typeof fetch;
+    assert.equal(hasMobileOtp(),true);
+    await sendMobileOtp('+919876543210','123456');
     globalThis.fetch=(async()=>Response.json({status:'failed'},{status:400})) as typeof fetch;
     await assert.rejects(sendMobileOtp('+919876543210','123456'),MobileOtpDeliveryError);
   }finally{
@@ -39,7 +46,7 @@ test('mobile verification can be exercised in local preview without SMS credenti
     assert.equal(mobileOtpEnabled(),true);
     process.env.VERCEL='1';
     assert.equal(mobileOtpEnabled(),false);
-    process.env.TWOFACTOR_API_KEY='test-api-key';process.env.TWOFACTOR_TEMPLATE_NAME='OCCANOVA_OTP';process.env.MOBILE_OTP_ENABLED='true';
+    process.env.TWOFACTOR_API_KEY='test-api-key';process.env.MOBILE_OTP_ENABLED='true';
     assert.equal(mobileOtpEnabled(),true);
   }finally{
     for(const [key,value] of Object.entries({LOCAL_PREVIEW:original.preview,VERCEL:original.vercel,TWOFACTOR_API_KEY:original.key,TWOFACTOR_TEMPLATE_NAME:original.template,MOBILE_OTP_ENABLED:original.enabled})){

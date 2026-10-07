@@ -26,11 +26,11 @@ The database uses separate collections for vendors, users, enquiries, sessions, 
 
 ## Vendor mobile OTP with 2Factor
 
-1. In 2Factor, prepare an approved SMS OTP template for a six-digit code. Use the exact template name supplied in the 2Factor account. The [2Factor custom OTP API](https://documenter.getpostman.com/view/301893/TWDamFGh) sends the application-generated code with the approved template.
-2. Set `TWOFACTOR_API_KEY` and `TWOFACTOR_TEMPLATE_NAME` in the private local `.env.local` file; do not commit the key. Sign in locally as a test vendor and complete one real send-and-verify on an Indian mobile number.
-3. After the delivery test, set both credentials and `MOBILE_OTP_ENABLED=true` in Vercel Production environment variables and redeploy. Check `/api/health`: `mobileOtp` means credentials are configured; `mobileOtpEnabled` means the verification requirement is active.
+1. The [2Factor custom OTP API](https://documenter.getpostman.com/view/301893/TWDamFGh) accepts the application-generated six-digit code. `TWOFACTOR_TEMPLATE_NAME` is optional; without it, 2Factor selects its default OTP template. Add an approved custom template name later if branded SMS is needed.
+2. Set `TWOFACTOR_API_KEY` in the private local `.env.local` file; do not commit the key. Sign in locally as a test vendor and complete one real send-and-verify on an Indian mobile number.
+3. After the delivery test, set `TWOFACTOR_API_KEY` and `MOBILE_OTP_ENABLED=true` in Vercel Production environment variables and redeploy. Check `/api/health`: `mobileOtp` means a key is configured; `mobileOtpEnabled` means the verification requirement is active.
 
-Codes expire after ten minutes, are limited to three sends and five verification attempts per ten minutes per vendor, plus five sends per phone number per hour, and are stored as keyed hashes. Until both 2Factor variables and the enable switch are set, production mobile verification stays disabled. Local preview displays a test code without sending an SMS when no provider credentials are configured.
+Codes expire after ten minutes, are limited to three sends and five verification attempts per ten minutes per vendor, plus five sends per phone number per hour, and are stored as keyed hashes. Until the 2Factor key and enable switch are set, production mobile verification stays disabled. Local preview displays a test code without sending an SMS when no provider key is configured.
 
 ## Working flows
 

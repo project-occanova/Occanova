@@ -24,8 +24,8 @@ export async function sendMobileOtp(phone:string,code:string){
   let response:Response;
   try{
     const key=encodeURIComponent(process.env.TWOFACTOR_API_KEY!);
-    const template=encodeURIComponent(process.env.TWOFACTOR_TEMPLATE_NAME!);
-    response=await fetch(`https://2factor.in/API/V1/${key}/SMS/${mobile}/${code}/${template}`,{signal:AbortSignal.timeout(12_000)});
+    const template=process.env.TWOFACTOR_TEMPLATE_NAME?`/${encodeURIComponent(process.env.TWOFACTOR_TEMPLATE_NAME)}`:'';
+    response=await fetch(`https://2factor.in/API/V1/${key}/SMS/${mobile}/${code}${template}`,{signal:AbortSignal.timeout(12_000)});
   }catch{throw new MobileOtpDeliveryError();}
   const result=await response.json().catch(()=>({})) as {status?:string;Status?:string};
   const status=(result.status??result.Status??'').toLowerCase();
