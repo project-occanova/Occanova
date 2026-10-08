@@ -10,7 +10,7 @@ import {AutopayFeedback} from './autopay-feedback';
 
 class SetupRequestError extends Error{constructor(public issue:AutopayIssue){super(issue.message);}}
 
-export function RegistrationAutopay({plan:initial,email,phone,enabled,trialEndsAt:initialDate,hasCheckout:initialCheckout=false,testMode=false}:{plan:PlanId;email:string;phone:string;enabled:boolean;trialEndsAt?:string;hasCheckout?:boolean;testMode?:boolean}){
+export function RegistrationAutopay({plan:initial,email,phone,mobileVerified,enabled,trialEndsAt:initialDate,hasCheckout:initialCheckout=false,testMode=false}:{plan:PlanId;email:string;phone:string;mobileVerified:boolean;enabled:boolean;trialEndsAt?:string;hasCheckout?:boolean;testMode?:boolean}){
  const router=useRouter();const active=useRef(false);const[plan,setPlan]=useState(initial),[consent,setConsent]=useState(false),[busy,setBusy]=useState(false),[issue,setIssue]=useState<AutopayIssue>(),[notice,setNotice]=useState(''),[trialEndsAt,setTrialEndsAt]=useState(initialDate),[hasCheckout,setHasCheckout]=useState(initialCheckout),[checkoutPlan,setCheckoutPlan]=useState(initial),[retrySeconds,setRetrySeconds]=useState(0);
  useEffect(()=>{if(!retrySeconds)return;const timer=setTimeout(()=>setRetrySeconds(value=>Math.max(0,value-1)),1000);return()=>clearTimeout(timer);},[retrySeconds]);
  const details=subscriptionPlans[plan];
@@ -33,9 +33,10 @@ export function RegistrationAutopay({plan:initial,email,phone,enabled,trialEndsA
  }
  return <section className="registration-autopay">
   <TrialOffer plan={plan}/>
-  <ol className="registration-steps" aria-label="Registration progress"><li>1. Plan selected</li><li>2. Email verified</li><li aria-current="step">3. Set up AutoPay</li></ol>
+  <ol className="registration-steps" aria-label="Registration progress"><li>1. Plan selected</li><li>2. Email verified</li><li>3. {mobileVerified?'Mobile verified':'Verify mobile later'}</li><li aria-current="step">4. Set up AutoPay</li></ol>
   {testMode&&<p className="notice">Test Mode — use Razorpay test payment details. This setup does not take a live subscription payment.</p>}
   <p>Email verified for <strong>{email}</strong>. Complete AutoPay authorization to create your vendor account.</p>
+  {!mobileVerified&&<p className="notice">Your registration started before mobile verification became part of signup. Verify your number in the vendor dashboard before submitting a profile for review.</p>}
   <fieldset className="plan-picker"><legend>Confirm your plan</legend><div className="plan-picker-grid">{planIds.map(id=><label key={id}><input type="radio" name="plan" checked={plan===id} disabled={busy} onChange={()=>{setPlan(id);setConsent(false);setNotice('');}}/><span><strong>{subscriptionPlans[id].name}</strong><b>₹{subscriptionPlans[id].monthlyRupees}/month</b><small>GST included</small></span></label>)}</div></fieldset>
   <div className="subscription-summary"><strong>{details.name}</strong><span>₹0 plan fee during your trial</span><small>Then ₹{details.monthlyRupees}/month, including GST, through AutoPay.</small>{trialEndsAt&&plan===checkoutPlan&&<small>First scheduled debit: {new Date(trialEndsAt).toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric',timeZone:'Asia/Kolkata'})}</small>}</div>
   <label className="checkbox"><input type="checkbox" checked={consent} disabled={busy} onChange={event=>setConsent(event.target.checked)}/><span>I authorize ₹{details.monthlyRupees}/month, including GST, after the two-month trial. I can cancel before the scheduled debit in my vendor studio.</span></label>

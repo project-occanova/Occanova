@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {MobileOtpDeliveryError,mobileOtpHash,normalizeIndianMobile,sendMobileOtp} from '../src/lib/mobile-otp';
+import {MobileOtpDeliveryError,consumeMobileChallenge,mobileOtpHash,normalizeIndianMobile,saveMobileChallenge,sendMobileOtp} from '../src/lib/mobile-otp';
+import {initialState} from '../src/lib/seed';
 import {hasMobileOtp,mobileOtpEnabled} from '../src/lib/config';
 import {registerSchema} from '../src/lib/validation';
 
@@ -10,6 +11,17 @@ test('Indian vendor mobile numbers are stored in E.164 format',()=>{
   assert.equal(normalizeIndianMobile('12345 67890'),'');
   const registration=registerSchema.parse({email:'vendor@example.com',phone:'9876543210',password:'secure-passphrase',plan:'starter',consent:true});
   assert.equal(registration.phone,'+919876543210');
+});
+
+test('a new registration OTP invalidates the old code, expires, and can be used only once',()=>{
+  const state=initialState(),phone='+919876543210',now=Date.now();
+  saveMobileChallenge(state,'pending-vendor',phone,'123456',now);
+  assert.equal(consumeMobileChallenge(state,'pending-vendor',phone,'000000',now+1),false);
+  saveMobileChallenge(state,'pending-vendor',phone,'654321',now+2);
+  assert.equal(consumeMobileChallenge(state,'pending-vendor',phone,'123456',now+3),false);
+  assert.equal(consumeMobileChallenge(state,'pending-vendor',phone,'654321',now+10*60*1000+2),false);
+  assert.equal(consumeMobileChallenge(state,'pending-vendor',phone,'654321',now+3),true);
+  assert.equal(consumeMobileChallenge(state,'pending-vendor',phone,'654321',now+4),false);
 });
 
 test('2Factor sends the one-time code with the approved template',async()=>{

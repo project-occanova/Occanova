@@ -25,6 +25,7 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{action:stri
  const pending=await currentRegistration();
  if(!pending){const user=await currentUser();if(user?.role==='vendor'&&user.subscription?.trialUsedAt)return NextResponse.json({ok:true,redirect:'/dashboard'});return recover('session_expired',401);}
  if(pending.completedUserId){await finishRegistrationSession(pending.completedUserId);return NextResponse.json({ok:true,redirect:'/dashboard'});}
+ if(pending.mobileVerificationRequired&&!pending.phoneVerified)return fail('Verify your mobile number before setting up AutoPay.',403);
   const raw=await req.text();if(raw.length>3000)return fail('Request too large',413);
   const body=JSON.parse(raw||'{}');
   if(action==='checkout'){

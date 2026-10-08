@@ -7,7 +7,7 @@ import {emailVerificationStatus,issueEmailVerification,recordVerificationEmail,r
 const now=Date.parse('2026-09-29T10:00:00Z'),day=86400000;
 function fixture(){
  const state=initialState();
- const pending=startRegistration(state,{email:'verify@example.com',phone:'+919876543210',passwordHash:'password-hash',plan:'starter',autopayConsent:true,verificationHash:'original'},now);
+ const pending=startRegistration(state,{email:'verify@example.com',phone:'+919876543210',passwordHash:'password-hash',plan:'starter',autopayConsent:true,verificationHash:'original',mobileVerificationRequired:true},now);
  return {state,pending};
 }
 test('resending preserves the original delivered link and its deadline',()=>{
@@ -79,7 +79,7 @@ test('expired or invalid tokens cannot verify, including reset tokens',()=>{
 });
 test('registration recovery lasts 30 days while verification and sessions expire after 24 hours',()=>{
  const {state,pending}=fixture();assert.equal(registrationRecoveryExpiry(pending),now+30*day);
- startRegistration(state,{email:'other@example.com',phone:'+919876543211',passwordHash:'hash',plan:'starter',autopayConsent:true,verificationHash:'other'},now+2*day);
+ startRegistration(state,{email:'other@example.com',phone:'+919876543211',passwordHash:'hash',plan:'starter',autopayConsent:true,verificationHash:'other',mobileVerificationRequired:true},now+2*day);
  assert.ok(state.registrations.some(row=>row.id===pending.id));
  assert.equal(issueEmailVerification(state,pending.email,'expired-registration',now+31*day),false);
  assert.equal(pending.verified,false);

@@ -6,7 +6,7 @@ import {registerSchema} from '../src/lib/validation';
 import {workspaceVersion} from '../src/lib/workspace-version';
 import {billingConfigured,billingMode,type RazorpaySubscription} from '../src/lib/subscriptions';
 
-const input={email:'new@example.com',phone:'+919876543210',passwordHash:'hash',plan:'starter' as const,autopayConsent:true,verificationHash:'token'};
+const input={email:'new@example.com',phone:'+919876543210',passwordHash:'hash',plan:'starter' as const,autopayConsent:true,verificationHash:'token',mobileVerificationRequired:true};
 test('Vercel production refuses test billing keys while a local test checkout remains supported',()=>{
  const keys=['VERCEL','VERCEL_ENV','RAZORPAY_KEY_ID','RAZORPAY_KEY_SECRET','RAZORPAY_WEBHOOK_SECRET','RAZORPAY_PLAN_STARTER','RAZORPAY_PLAN_GROWTH','RAZORPAY_PLAN_PRO','RAZORPAY_PLAN_PREMIUM'];const saved=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
  try{
@@ -25,7 +25,7 @@ test('legacy Indian phone formats cannot bypass duplicate signup or mandate acti
  for(const phone of ['9876543210','91 98765 43210','+91 (98765) 43210']){
   const state=initialState();state.users.push({id:'legacy',email:'legacy@example.com',phone,passwordHash:'hash',role:'vendor',verified:true});
   assert.throws(()=>startRegistration(state,input),/already uses/);assert.equal(state.registrations.length,0);
-  const other=initialState(),pending=startRegistration(other,input);pending.verified=true;const start=Math.floor((Date.now()+86400000)/1000);
+  const other=initialState(),pending=startRegistration(other,input);pending.verified=true;pending.phoneVerified=true;const start=Math.floor((Date.now()+86400000)/1000);
   pending.subscription={plan:'starter',status:'created',gatewayId:'sub_fixture',gatewayPlanId:'plan_fixture',trialEndsAt:new Date(start*1000).toISOString(),updatedAt:new Date().toISOString()};
   other.users.push(state.users[0]);const remote:RazorpaySubscription={id:'sub_fixture',plan_id:'plan_fixture',status:'authenticated',start_at:start,paid_count:0,quantity:1,total_count:96,notes:{occanova_registration_id:pending.id}};
   assert.throws(()=>activateRegistration(other,pending.id,remote),/already uses/);assert.equal(other.users.length,1);

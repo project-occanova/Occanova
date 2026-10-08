@@ -1,13 +1,14 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {initialState} from '../src/lib/seed';
-import {startRegistration,activateRegistration} from '../src/lib/registration';
+import {startRegistration,activateRegistration,changeRegistrationPhone} from '../src/lib/registration';
+import {consumeMobileChallenge,saveMobileChallenge} from '../src/lib/mobile-otp';
 import {prepareSubscription,trialEnd,type RazorpaySubscription} from '../src/lib/subscriptions';
 import type {VendorSubscription} from '../src/lib/types';
 const now=Date.parse('2026-09-28T10:00:00Z');
-const input={email:'registration@example.com',phone:'+919876543210',passwordHash:'hashed-password',plan:'starter' as const,autopayConsent:true,verificationHash:'hashed-token'};
+const input={email:'registration@example.com',phone:'+919876543210',passwordHash:'hashed-password',plan:'starter' as const,autopayConsent:true,verificationHash:'hashed-token',mobileVerificationRequired:true};
 function fixture(){
- const state=initialState();const pending=startRegistration(state,input,now);pending.verified=true;
+ const state=initialState();const pending=startRegistration(state,input,now);pending.verified=true;pending.phoneVerified=true;pending.phoneVerifiedAt=new Date(now).toISOString();
  pending.subscription={plan:'starter',status:'created',gatewayId:'sub_test',gatewayPlanId:'plan_test',trialEndsAt:'2026-11-28T10:00:00Z',updatedAt:new Date(now).toISOString()};
  const remote:RazorpaySubscription={id:'sub_test',plan_id:'plan_test',status:'authenticated',start_at:Math.floor(Date.parse(pending.subscription.trialEndsAt!)/1000),paid_count:0,quantity:1,total_count:96,notes:{occanova_registration_id:pending.id}};
  return {state,pending,remote};
@@ -19,13 +20,29 @@ test('registration requires explicit AutoPay consent and creates no vendor accou
 test('email verification alone and non-authorized mandates cannot activate registration',()=>{
  for(const status of ['created','cancelled','expired','pending','halted']){const {state,pending,remote}=fixture();assert.throws(()=>activateRegistration(state,pending.id,{...remote,status},now));assert.equal(state.users.length,0);}
  const {state,pending,remote}=fixture();pending.verified=false;assert.throws(()=>activateRegistration(state,pending.id,remote,now),/Verify/);assert.equal(state.users.length,0);
+ const missingMobile=fixture();missingMobile.pending.phoneVerified=false;assert.throws(()=>activateRegistration(missingMobile.state,missingMobile.pending.id,missingMobile.remote,now),/mobile/);assert.equal(missingMobile.state.users.length,0);
 });
 test('gateway ownership, plan, debit schedule and cycle count are checked before activation',()=>{
  for(const change of [{id:'sub_other'},{plan_id:'plan_other'},{start_at:0},{start_at:now/1000},{quantity:2},{total_count:1},{notes:{occanova_registration_id:'other'}}]){const {state,pending,remote}=fixture();assert.throws(()=>activateRegistration(state,pending.id,{...remote,...change},now));assert.equal(state.users.length,0);}
 });
 test('authenticated mandate activates once even when callback and webhook repeat',()=>{
  const {state,pending,remote}=fixture();pending.verificationEmail={status:'accepted',attemptedAt:new Date(now).toISOString(),providerId:'verification-reference'};const first=activateRegistration(state,pending.id,remote,now);const second=activateRegistration(state,pending.id,{...remote,status:'active'},now+1000);
- assert.equal(first.id,second.id);assert.equal(state.users.length,1);assert.equal(first.subscription?.trialUsedAt,new Date(now).toISOString());assert.equal(first.role,'vendor');assert.equal(first.verified,true);assert.equal(state.sessions.length,0);assert.deepEqual(first.verificationEmail,pending.verificationEmail);
+ assert.equal(first.id,second.id);assert.equal(state.users.length,1);assert.equal(first.subscription?.trialUsedAt,new Date(now).toISOString());assert.equal(first.role,'vendor');assert.equal(first.verified,true);assert.equal(first.phoneVerified,true);assert.equal(first.phoneVerifiedAt,pending.phoneVerifiedAt);assert.equal(state.sessions.length,0);assert.deepEqual(first.verificationEmail,pending.verificationEmail);
+});
+test('changing a pending mobile number invalidates its OTP and checks uniqueness',()=>{
+ const state=initialState();const pending=startRegistration(state,input,now);pending.verified=true;
+ saveMobileChallenge(state,pending.id,pending.phone,'123456',now);
+ changeRegistrationPhone(state,pending.id,'+91 98765 43211');
+ assert.equal(pending.phone,'+919876543211');assert.equal(state.tokens.length,0);
+ assert.equal(consumeMobileChallenge(state,pending.id,pending.phone,'123456',now+1),false);
+ state.users.push({id:'other',email:'other@example.com',phone:'+919876543212',passwordHash:'hash',role:'vendor',verified:true});
+ assert.throws(()=>changeRegistrationPhone(state,pending.id,'9876543212'),/already uses/);
+ pending.subscription={plan:'starter',status:'created',gatewayId:'sub_started',updatedAt:new Date(now).toISOString()};
+ assert.throws(()=>changeRegistrationPhone(state,pending.id,'9876543213'),/cannot be changed/);
+});
+test('previous in-flight registrations can finish and verify mobile in the dashboard',()=>{
+ const {state,pending,remote}=fixture();pending.mobileVerificationRequired=undefined;pending.phoneVerified=false;
+ const user=activateRegistration(state,pending.id,remote,now);assert.equal(user.phoneVerified,false);
 });
 test('duplicate email or phone cannot produce another registration or active account',()=>{
  for(const identity of ['email','phone'] as const){const {state,pending,remote}=fixture();assert.throws(()=>startRegistration(state,{...input,[identity]:pending[identity]},now),/already in progress/);

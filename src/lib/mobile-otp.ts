@@ -1,5 +1,6 @@
 import {createHmac} from 'node:crypto';
 import {hasMobileOtp} from './config';
+import type {State} from './types';
 
 export class MobileOtpDeliveryError extends Error{
   constructor(){super('The verification message could not be sent. Please try again shortly.');}
@@ -15,6 +16,20 @@ export function mobileOtpHash(userId:string,phone:string,code:string){
   // The provider key peppers short OTPs in production; local preview has no real recipients.
   const secret=process.env.TWOFACTOR_API_KEY||'occanova-local-preview-only';
   return createHmac('sha256',secret).update(`${userId}:${phone}:${code}`).digest('hex');
+}
+
+export function saveMobileChallenge(state:State,subjectId:string,phone:string,code:string,now=Date.now()){
+  const hash=mobileOtpHash(subjectId,phone,code);
+  state.tokens=state.tokens.filter(row=>!(row.userId===subjectId&&row.kind==='mobile'));
+  state.tokens.push({hash,userId:subjectId,kind:'mobile',expires:now+10*60*1000});
+  return hash;
+}
+
+export function consumeMobileChallenge(state:State,subjectId:string,phone:string,code:string,now=Date.now()){
+  const hash=mobileOtpHash(subjectId,phone,code);
+  if(!state.tokens.some(row=>row.userId===subjectId&&row.kind==='mobile'&&row.hash===hash&&row.expires>now))return false;
+  state.tokens=state.tokens.filter(row=>!(row.userId===subjectId&&row.kind==='mobile'));
+  return true;
 }
 
 export async function sendMobileOtp(phone:string,code:string){

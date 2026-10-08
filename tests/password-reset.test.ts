@@ -5,8 +5,8 @@ import {startRegistration,activateRegistration} from '../src/lib/registration';
 import {issuePasswordReset,resetAccountPassword,revokePasswordReset} from '../src/lib/password-reset';
 
 test('an unfinished verified signup can reset its password without activating an account',()=>{
- const state=initialState();const now=Date.now();const pending=startRegistration(state,{email:'pending@example.com',phone:'+919876543210',passwordHash:'old-hash',plan:'starter',autopayConsent:true,verificationHash:'verify'},now);
- pending.verified=true;pending.sessionHash='old-setup-session';
+ const state=initialState();const now=Date.now();const pending=startRegistration(state,{email:'pending@example.com',phone:'+919876543210',passwordHash:'old-hash',plan:'starter',autopayConsent:true,verificationHash:'verify',mobileVerificationRequired:true},now);
+ pending.verified=true;pending.phoneVerified=true;pending.sessionHash='old-setup-session';
  assert.equal(issuePasswordReset(state,pending.email,'reset',now),true);
  resetAccountPassword(state,'reset','new-hash',now+1);
  assert.equal(state.users.length,0);assert.equal(pending.passwordHash,'new-hash');assert.equal(pending.sessionHash,undefined);assert.equal(pending.verified,true);assert.equal(state.tokens.length,0);
