@@ -52,6 +52,21 @@ export async function deleteUploads(keys:string[]){
   for(let index=0;index<safe.length;index+=1000){const batch=safe.slice(index,index+1000);const result=await client().send(new DeleteObjectsCommand({Bucket:bucket,Delete:{Objects:batch.map(Key=>({Key})),Quiet:true}}));if(result.Errors?.length)throw Error(`Storage rejected ${result.Errors.length} file deletions.`);deleted+=batch.length;}
   return deleted;
 }
+export async function recentVendorUploads(userId:string){
+  const {bucket}=settings();const prefix=`vendors/${userId}/`;let continuationToken:string|undefined;
+  const uploads:{key:string;path:string;kind:UploadKind;uploadedAt:string}[]=[];
+  do{
+    const page=await client().send(new ListObjectsV2Command({Bucket:bucket,Prefix:prefix,ContinuationToken:continuationToken,MaxKeys:1000}));
+    for(const object of page.Contents??[]){
+      const key=object.Key;
+      if(!key||!validVendorKey(key)||!key.startsWith(prefix)||!object.LastModified)continue;
+      const kind=key.slice(prefix.length).split('/')[0] as UploadKind;
+      uploads.push({key,path:`/api/media?key=${encodeURIComponent(key)}`,kind,uploadedAt:object.LastModified.toISOString()});
+    }
+    continuationToken=page.IsTruncated?page.NextContinuationToken:undefined;
+  }while(continuationToken);
+  return uploads.sort((a,b)=>b.uploadedAt.localeCompare(a.uploadedAt)).slice(0,50);
+}
 export async function cleanupOrphanedUploads(referenced:Set<string>,olderThan:Date){
   const {bucket}=settings();let continuationToken:string|undefined;let scanned=0;const orphaned:string[]=[];
   do{

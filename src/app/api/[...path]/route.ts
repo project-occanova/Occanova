@@ -5,12 +5,13 @@ import { z } from 'zod';
 import { mutate,readPublicDirectory,readState } from '@/lib/store';
 import { currentUser,hashPassword,checkPassword,token,digest,cookieOptions,portalAllowed } from '@/lib/auth';
 import { registerSchema,enquirySchema,profileSchema,draftProfileSchema,adminVendorProfileSchema,vendorLifecycleSchema } from '@/lib/validation';
-import { slugify,publicVendors,publicVendorProfile } from '@/lib/directory';
+import { slugify,publicVendors,publicVendorProfile,snapshotPublishedVendor } from '@/lib/directory';
 import {backendReady,hasDatabase,hasEmail,hasMobileOtp,hasStorage,localPreview,mobileOtpEnabled,publicIntakeEnabled,readOnlyDeployment} from '@/lib/config';
 import {rateLimited} from '@/lib/rate-limit';
-import {EmailSendError,sendEnquiryNotifications,sendResetEmail,sendVerificationEmail} from '@/lib/email';
-import {cleanupOrphanedUploads,createDownload,deleteUploads,validVendorKey,vendorStorageKeys} from '@/lib/storage';
-import {MobileOtpDeliveryError,mobileOtpHash,normalizeIndianMobile,sendMobileOtp} from '@/lib/mobile-otp';
+import {EmailSendError,sendEnquiryNotifications,sendMobileChangedEmail,sendResetEmail,sendVerificationEmail} from '@/lib/email';
+import {cleanupOrphanedUploads,createDownload,validVendorKey,vendorStorageKeys} from '@/lib/storage';
+import {MobileOtpDeliveryError,normalizeIndianMobile,saveMobileChallenge,sendMobileOtp} from '@/lib/mobile-otp';
+import {mobileVerificationTarget,stageAccountPhone,verifyAccountPhone} from '@/lib/account-phone';
 import {billingEnabled,billingMode} from '@/lib/subscriptions';
 import {assertPlanAccess,assertPortfolioLimit,PlanAccessError} from '@/lib/plan-access';
 import {startRegistration} from '@/lib/registration';
@@ -37,8 +38,8 @@ export async function GET(req:NextRequest,{params}:{params:Promise<{path:string[
   if(!hasStorage())return NextResponse.json({ok:true,skipped:true,reason:'Private file storage is not configured.'});
   const secret=process.env.CRON_SECRET;if(!secret)return fail('Maintenance is not configured.',503);
   if(req.headers.get('authorization')!==`Bearer ${secret}`)return fail('Access denied',401);
-  const state=await readState();const referenced=new Set(state.vendors.flatMap(vendorStorageKeys));
-  return NextResponse.json({ok:true,...await cleanupOrphanedUploads(referenced,new Date(Date.now()-24*60*60*1000))});
+  const state=await readState();const referenced=new Set(state.vendors.flatMap(vendor=>[...vendorStorageKeys(vendor),...(vendor.publishedSnapshot?vendorStorageKeys({image:vendor.publishedSnapshot.image,gallery:vendor.publishedSnapshot.gallery,documents:[]}):[])]));
+  return NextResponse.json({ok:true,...await cleanupOrphanedUploads(referenced,new Date(Date.now()-7*24*60*60*1000))});
  }
  if(!['media','vendors'].includes(route))return fail('Not found',404);
  if(route==='vendors'){
@@ -51,7 +52,7 @@ export async function GET(req:NextRequest,{params}:{params:Promise<{path:string[
   const key=req.nextUrl.searchParams.get('key')||'';if(!validVendorKey(key))return fail('Invalid file key',400);
   const [,ownerId,kind]=key.split('/');const user=await currentUser();const vendor=s.vendors.find(x=>x.userId===ownerId);const privileged=user&&(user.role==='admin'||user.id===ownerId);
   if(kind==='document'&&!privileged)return fail('Access denied',403);
-  const path=`/api/media?key=${encodeURIComponent(key)}`;if(!privileged&&!(vendor&&publicVendors([vendor],{},s.users).length&&(vendor.image===path||vendor.gallery.includes(path))))return fail('File not found',404);
+  const path=`/api/media?key=${encodeURIComponent(key)}`;const publicVendor=vendor&&publicVendors([vendor],{},s.users)[0];if(!privileged&&!(publicVendor&&(publicVendor.image===path||publicVendor.gallery.includes(path))))return fail('File not found',404);
   const response=NextResponse.redirect(await createDownload(key),302);response.headers.set('Cache-Control','private, no-store');return response;
  }
  return fail('Not found',404);
@@ -152,14 +153,13 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
   }
   if(route==='auth/mobile/send'){
    if(user.role!=='vendor')return fail('Vendor access required',403);
-   if(user.phoneVerified)return NextResponse.json({ok:true,verified:true,message:'Your mobile number is already verified.'});
-   const phone=normalizeIndianMobile(user.phone);if(!phone)return fail('Your account does not have a valid Indian mobile number.',400);
+   const phone=mobileVerificationTarget(user);
+   if(!phone)return fail(user.phoneVerified?'Start a new mobile number change to receive an OTP.':'Your account does not have a valid Indian mobile number.',400);
    if(!mobileOtpEnabled())return fail('Mobile verification is not configured yet.',503);
    if(await rateLimited(`mobile-send:${user.id}`,3,10*60*1000))return fail('Too many verification requests. Please wait 10 minutes and try again.',429);
    if(await rateLimited(`mobile-phone:${phone}`,5,60*60*1000))return fail('Too many verification requests for this number. Please try again in an hour.',429);
    const code=String(randomInt(100000,1000000));
-   const hash=mobileOtpHash(user.id,phone,code);
-   await mutate(s=>{s.tokens=s.tokens.filter(x=>!(x.userId===user.id&&x.kind==='mobile'));s.tokens.push({hash,userId:user.id,kind:'mobile',expires:Date.now()+10*60*1000});});
+   const hash=await mutate(s=>{const account=s.users.find(x=>x.id===user.id);if(!account||mobileVerificationTarget(account)!==phone)throw Error('Mobile number changed. Refresh and try again.');return saveMobileChallenge(s,user.id,phone,code);});
    if(hasMobileOtp()){
     try{await sendMobileOtp(phone,code);}catch(error){await mutate(s=>{s.tokens=s.tokens.filter(x=>!(x.userId===user.id&&x.kind==='mobile'&&x.hash===hash));});throw error;}
     return NextResponse.json({ok:true,message:'A six-digit verification code was sent by SMS.'});
@@ -168,22 +168,24 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
   }
   if(route==='auth/mobile/verify'){
    if(user.role!=='vendor')return fail('Vendor access required',403);
-   if(user.phoneVerified)return NextResponse.json({ok:true,verified:true,message:'Your mobile number is already verified.'});
    const code=z.string().regex(/^\d{6}$/,'Enter the six-digit verification code.').parse(b.code);
-   const phone=normalizeIndianMobile(user.phone);if(!phone)return fail('Your account does not have a valid Indian mobile number.',400);
+   if(!mobileVerificationTarget(user))return fail(user.phoneVerified?'Start a new mobile number change to receive an OTP.':'Your account does not have a valid Indian mobile number.',400);
    if(!mobileOtpEnabled())return fail('Mobile verification is not configured yet.',503);
    if(await rateLimited(`mobile-check:${user.id}`,5,10*60*1000))return fail('Too many incorrect attempts. Please wait 10 minutes and request a new code.',429);
-   const approved=await mutate(s=>{
-    const hash=mobileOtpHash(user.id,phone,code);
-    if(!s.tokens.some(x=>x.userId===user.id&&x.kind==='mobile'&&x.hash===hash&&x.expires>Date.now()))return false;
-    const account=s.users.find(x=>x.id===user.id);if(!account)throw Error('Access denied');
-    account.phoneVerified=true;account.phoneVerifiedAt=new Date().toISOString();
-    s.tokens=s.tokens.filter(x=>!(x.userId===user.id&&x.kind==='mobile'));
-    s.audit.unshift({id:randomUUID(),actor:user.email,action:'Mobile number verified',target:'Vendor account',remarks:'Verified by one-time SMS code',at:new Date().toISOString()});
-    return true;
-   });
+   const changed=Boolean(user.pendingPhone&&Number(user.pendingPhoneExpires)>Date.now());
+   const approved=await mutate(s=>verifyAccountPhone(s,user.id,code));
    if(!approved)return fail('The verification code is incorrect or expired.',400);
-   return NextResponse.json({ok:true,verified:true,message:'Mobile number verified successfully.'});
+   if(changed&&user.pendingPhone)after(async()=>{try{await sendMobileChangedEmail(user.email,user.pendingPhone!);}catch(error){console.error('Mobile change security email failed',error instanceof EmailSendError?error.source:'unknown');}});
+   return NextResponse.json({ok:true,verified:true,message:changed?'New mobile number verified. It is now your login and public listing number.':'Mobile number verified successfully.'});
+  }
+  if(route==='auth/mobile/change'){
+   if(user.role!=='vendor')return fail('Vendor access required',403);
+   if(!mobileOtpEnabled())return fail('Mobile verification is not configured yet.',503);
+   const input=z.object({phone:z.string().trim().min(10).max(20),password:z.string().min(1).max(128)}).parse(b);
+   if(await rateLimited(`mobile-change:${user.id}`,3,60*60*1000))return fail('Too many number changes. Please try again in an hour.',429);
+   if(!checkPassword(input.password,user.passwordHash))return fail('Current password is incorrect.',403);
+   const phone=await mutate(s=>{const account=s.users.find(row=>row.id===user.id);if(!account||!checkPassword(input.password,account.passwordHash))throw Error('Current password is incorrect.');return stageAccountPhone(s,user.id,input.phone);});
+   return NextResponse.json({ok:true,phone,message:'New number saved for verification. Send an OTP to confirm it. Your existing contact number stays in place until then.'});
   }
   if(route==='profile') {
    if(user.role!=='vendor')return fail('Vendor access required',403);
@@ -198,16 +200,14 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
     if(normalizeIndianMobile(v.phone)!==normalizeIndianMobile(account.phone))throw Error('The public phone number must match your account mobile number. Refresh the page and try again.');
     const category=s.categories.find(x=>x.active&&x.name===v.category);if((v.category&&!category)||(v.service&&!category?.services?.includes(v.service))||!coverage.every(location=>s.locations.some(x=>x.active&&x.name===location)))throw Error('Choose an active category, specialisation, and location.');
     let vendor=s.vendors.find(x=>x.userId===user.id);if(vendor?.status==='suspended'||vendor?.status==='inactive')throw Error('Contact Occanova to reactivate your account.');
-    const previous=vendor?new Set(vendorStorageKeys(vendor)):new Set<string>();
     const changed=!vendor||Object.entries(v).some(([key,value])=>JSON.stringify((vendor as Record<string,unknown>)[key])!==JSON.stringify(value));
     const newlySubmitted=b.submit===true&&(vendor?.status!=='pending'||changed);
     if(!vendor){vendor={id:randomUUID(),userId:user.id,slug:slugify(v.name||'vendor')+'-'+randomUUID().slice(0,6),status:'draft',published:false,featured:false,priority:100,featuredStart:'',featuredEnd:'',remarks:'',sample:false,...v,locations:coverage};s.vendors.push(vendor);}
-    else Object.assign(vendor,v,{locations:coverage,status:'draft',published:false});
+    else {if(vendor.status==='approved'&&vendor.published)vendor.publishedSnapshot=snapshotPublishedVendor(vendor);Object.assign(vendor,v,{locations:coverage,status:'draft',published:false});}
     let notification;
     if(b.submit===true){vendor.status='pending';vendor.remarks='';delete vendor.reviewedAt;if(newlySubmitted){vendor.submittedAt=new Date().toISOString();notification=notifyVendor(s,vendor,'submitted');s.audit.unshift({id:randomUUID(),actor:user.email,action:'Vendor profile submitted for review',target:vendor.name,remarks:'Waiting for an approval decision',at:vendor.submittedAt});}}
-    const retained=new Set(vendorStorageKeys(vendor));return {vendor,obsolete:[...previous].filter(key=>!retained.has(key)),notification};
+    return {vendor,notification};
    });
-   if(hasStorage()&&result.obsolete.length)try{await deleteUploads(result.obsolete);}catch(error){console.error('Upload cleanup failed; scheduled maintenance will retry.',error);}
    const emailStatus=result.notification?await deliverReviewNotification(result.notification.userId,result.notification.notice.id):undefined;
    return NextResponse.json({ok:true,vendor:result.vendor,emailStatus});
   }
@@ -215,7 +215,7 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
   if(route==='enquiry-status'){const v=z.object({id:z.string(),status:z.enum(['new','contacted','closed'])}).parse(b);await mutate(s=>{const e=s.enquiries.find(x=>x.id===v.id);if(!e)throw Error('Enquiry not found');if(user.role!=='admin'&&!s.vendors.some(x=>x.id===e.vendorId&&x.userId===user.id))throw Error('Access denied');e.status=v.status;});return NextResponse.json({ok:true});}
   if(user.role!=='admin')return fail('Admin access required',403);
   if(route==='admin/vendor-profile'){const v=adminVendorProfileSchema.parse(b);const coverage=[...new Set([v.city,...(v.locations??[])])];await mutate(s=>{const category=s.categories.find(x=>x.active&&x.name===v.category);if(!category||!category.services?.includes(v.service)||!coverage.every(location=>s.locations.some(x=>x.active&&x.name===location)))throw Error('Choose an active category, specialisation, and location.');const vendor=s.vendors.find(x=>x.id===v.id);if(!vendor)throw Error('Vendor not found');const account=s.users.find(x=>x.id===vendor.userId);if(account&&normalizeIndianMobile(v.phone)!==normalizeIndianMobile(account.phone))throw Error('A vendor account’s public phone must match its verified mobile number.');const {id,...profile}=v;void id;Object.assign(vendor,profile,{locations:coverage});s.audit.unshift({id:randomUUID(),actor:user.email,action:'Vendor profile updated by administrator',target:vendor.name,remarks:'Business details corrected in the admin studio',at:new Date().toISOString()});});return NextResponse.json({ok:true});}
-  if(route==='admin/vendor-lifecycle'){const v=vendorLifecycleSchema.parse(b);await mutate(s=>{const vendor=s.vendors.find(x=>x.id===v.id);if(!vendor)throw Error('Vendor not found');if(!vendor.userId)throw Error('This listing does not have a vendor account.');if(v.action==='deactivate'){vendor.status='inactive';vendor.published=false;vendor.featured=false;s.sessions=s.sessions.filter(x=>x.userId!==vendor.userId);s.tokens=s.tokens.filter(x=>x.userId!==vendor.userId);}else{vendor.status='draft';vendor.published=false;vendor.featured=false;}s.audit.unshift({id:randomUUID(),actor:user.email,action:v.action==='deactivate'?'Vendor account deactivated':'Vendor account reactivated to draft',target:vendor.name,remarks:v.remarks,at:new Date().toISOString()});});return NextResponse.json({ok:true});}
+  if(route==='admin/vendor-lifecycle'){const v=vendorLifecycleSchema.parse(b);await mutate(s=>{const vendor=s.vendors.find(x=>x.id===v.id);if(!vendor)throw Error('Vendor not found');if(!vendor.userId)throw Error('This listing does not have a vendor account.');if(v.action==='deactivate'){vendor.status='inactive';vendor.published=false;vendor.featured=false;delete vendor.publishedSnapshot;s.sessions=s.sessions.filter(x=>x.userId!==vendor.userId);s.tokens=s.tokens.filter(x=>x.userId!==vendor.userId);}else{vendor.status='draft';vendor.published=false;vendor.featured=false;delete vendor.publishedSnapshot;}s.audit.unshift({id:randomUUID(),actor:user.email,action:v.action==='deactivate'?'Vendor account deactivated':'Vendor account reactivated to draft',target:vendor.name,remarks:v.remarks,at:new Date().toISOString()});});return NextResponse.json({ok:true});}
   if(route==='admin/vendor') {
    const v=z.object({id:z.string(),status:z.enum(['draft','pending','approved','rejected','suspended','inactive']),published:z.boolean(),featured:z.boolean(),priority:z.coerce.number().int().min(0).max(10000),featuredStart:z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/),featuredEnd:z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/),remarks:z.string().trim().min(3).max(1000)}).parse(b);
    if(v.featuredStart&&v.featuredEnd&&v.featuredStart>v.featuredEnd)return fail('Featured end must follow start.');
@@ -226,6 +226,7 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
     if(v.status==='approved'&&vendor.userId){profileSchema.parse(vendor);assertPlanAccess(account?.subscription);assertPortfolioLimit(account?.subscription,vendor.gallery.length);}
     const before={status:vendor.status,published:vendor.published};
     Object.assign(vendor,v,{published:v.status==='approved'&&v.published,featured:v.status==='approved'&&v.featured});
+    if(v.status==='approved'||v.status==='inactive'||v.status==='suspended')delete vendor.publishedSnapshot;
     if(v.status==='approved'||v.status==='rejected')vendor.reviewedAt=new Date().toISOString();
     if((v.status==='inactive'||v.status==='suspended')&&vendor.userId){s.sessions=s.sessions.filter(x=>x.userId!==vendor.userId);s.tokens=s.tokens.filter(x=>x.userId!==vendor.userId);}
     s.audit.unshift({id:randomUUID(),actor:user.email,action:`Vendor set to ${v.status}; published ${vendor.published}; featured ${vendor.featured}`,target:vendor.name,remarks:v.remarks,at:new Date().toISOString()});
@@ -251,7 +252,7 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
   if(e instanceof z.ZodError)return fail(e.issues[0]?validationFeedback(e.issues[0]):'Check the form fields');
   if(e instanceof SyntaxError)return fail('Invalid JSON');
   if(e&&typeof e==='object'&&'code' in e&&e.code===11000)return fail('An account already uses this email or phone.',409);
-  const safe=['Agree to recurring AutoPay','Registration is already in progress','An account already uses','This verification link','Email/mobile or password','Verify your email','This reset link','This vendor is unavailable','This listing does not have','Choose an active','Add the first subcategory','This subcategory already exists','Contact Occanova','Current password','Enquiry not found','Access denied','Administrator access','Use the separate administrator','Vendor not found','Featured end','Private file storage','Choose an allowed','Public registration','Public enquiries','Mobile verification','Your account does not have','Too many verification','Too many incorrect','The verification code','The verification message','The mobile verification service','Verify your mobile','Vendor plan authorization'];
+  const safe=['Agree to recurring AutoPay','Registration is already in progress','An account already uses','An account or registration already uses','This verification link','Email/mobile or password','Verify your email','This reset link','This vendor is unavailable','This listing does not have','Choose an active','Add the first subcategory','This subcategory already exists','Contact Occanova','Current password','Enquiry not found','Access denied','Administrator access','Use the separate administrator','Vendor not found','Featured end','Private file storage','Choose an allowed','Public registration','Public enquiries','Mobile verification','Mobile number changed','Your account does not have','Too many verification','Too many incorrect','The verification code','The verification message','The mobile verification service','Verify your mobile','Vendor plan authorization','Enter a valid Indian mobile number','This number is already verified','This is already your account number','Start a new mobile number change','Another account now uses'];
   if(e instanceof Error&&safe.some(x=>e.message.startsWith(x)))return fail(e.message);
   console.error('API request failed',e);return fail('Request failed. Please try again.',500);
  }

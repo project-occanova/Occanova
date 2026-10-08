@@ -1,12 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {initialState} from '../src/lib/seed';
-import {publicVendors,isFeatured} from '../src/lib/directory';
+import {publicVendors,isFeatured,snapshotPublishedVendor} from '../src/lib/directory';
 import {adminVendorProfileSchema,enquirySchema,profileSchema,vendorLifecycleSchema} from '../src/lib/validation';
 import {hashPassword,checkPassword,digest,portalAllowed} from '../src/lib/auth';
 import {storageKeyFromPath,validVendorKey,vendorStorageKeys} from '../src/lib/storage';
 import {backendReady,publicIntakeEnabled,readOnlyDeployment,siteIndexable} from '../src/lib/config';
 test('hidden, unapproved and suspended vendors never enter discovery',()=>{const s=initialState();s.vendors[0].published=false;s.vendors[1].status='pending';s.vendors[2].status='suspended';assert.equal(publicVendors(s.vendors).length,5);});
+test('a revised approved listing keeps its last reviewed media and copy public until approval',()=>{
+ const vendor=initialState().vendors[0];vendor.publishedSnapshot=snapshotPublishedVendor(vendor);
+ const originalName=vendor.name,originalImage=vendor.image;
+ vendor.name='Unreviewed change';vendor.image='/api/media?key=vendors%2Fnew%2Flogo%2Fnew.jpg';vendor.status='pending';vendor.published=false;
+ const [visible]=publicVendors([vendor]);assert.equal(visible.name,originalName);assert.equal(visible.image,originalImage);assert.equal(visible.status,'approved');
+ vendor.status='suspended';assert.equal(publicVendors([vendor]).length,0);
+});
 test('category and city filters intersect, including URL slugs',()=>{const rows=publicVendors(initialState().vendors,{category:'decoration-florists',city:'kochi'});assert.equal(rows.length,1);assert.equal(rows[0].name,'The Marigold Collective');assert.equal(publicVendors(initialState().vendors,{category:'photography-media',city:'thrissur'}).length,0);});
 test('subcategory filters intersect with category and location',()=>{const vendors=initialState().vendors;assert.deepEqual(publicVendors(vendors,{category:'photography-media',service:'photographers',city:'kochi'}).map(x=>x.name),['Frame & Fable']);assert.equal(publicVendors(vendors,{category:'photography-media',service:'videographers'}).length,0);assert.equal(publicVendors(vendors,{category:'catering-food',service:'photographers'}).length,0);});
 test('nationwide taxonomy covers India and Pan India vendors match local searches',()=>{const state=initialState();for(const city of ['Pan India','Delhi NCR','Mumbai','Kolkata','Chennai','Bengaluru','Hyderabad','Guwahati','Srinagar','Port Blair'])assert.ok(state.locations.some(x=>x.name===city));const nationwide={...state.vendors[0],id:'nationwide',slug:'nationwide',city:'Pan India',locations:['Pan India']};assert.equal(publicVendors([nationwide],{city:'jaipur'}).length,1);});

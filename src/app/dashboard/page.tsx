@@ -62,7 +62,7 @@ export default async function Dashboard(){
     </details>
     <ReviewUpdates notifications={user.notifications??[]} status={v?.status}/>
 
-    {mobileOtpEnabled()&&<MobileVerification phone={user.phone} verified={Boolean(user.phoneVerified)} enabled/>}
+    {mobileOtpEnabled()&&<MobileVerification key={`${user.phone}:${user.pendingPhone??''}:${user.phoneVerified}`} phone={user.phone} pendingPhone={user.pendingPhoneExpires&&user.pendingPhoneExpires>Date.now()?user.pendingPhone:undefined} verified={Boolean(user.phoneVerified)} enabled/>}
 
     <SubscriptionPanel subscription={user.subscription} enabled={billingEnabled()} email={user.email} phone={user.phone} portfolioCount={v?.gallery.length??0} access={access}/>
     {paymentsEnabled()&&<p className="quiet-note"><Link href="/dashboard/payments">Make a one-time payment</Link> for an amount agreed with Occanova.</p>}

@@ -2,7 +2,7 @@ import {NextRequest,NextResponse} from 'next/server';
 import {currentUser} from '@/lib/auth';
 import {readOnlyDeployment} from '@/lib/config';
 import {rateLimited} from '@/lib/rate-limit';
-import {storeUpload,type UploadKind} from '@/lib/storage';
+import {recentVendorUploads,storeUpload,vendorStorageKeys,type UploadKind} from '@/lib/storage';
 import {readState} from '@/lib/store';
 import {assertPlanAccess,portfolioLimit,PlanAccessError} from '@/lib/plan-access';
 
@@ -10,6 +10,20 @@ export const runtime='nodejs';
 const SERVER_UPLOAD_MAX=4_000_000;
 const fail=(message:string,status=400)=>NextResponse.json({error:message},{status});
 const uploadKinds=new Set<UploadKind>(['logo','portfolio','document']);
+
+export async function GET(){
+  try{
+    const user=await currentUser();
+    if(!user)return fail('Please sign in.',401);
+    if(user.role!=='vendor')return fail('Vendor access required',403);
+    const [uploads,state]=await Promise.all([recentVendorUploads(user.id),readState()]);
+    const saved=new Set(state.vendors.filter(vendor=>vendor.userId===user.id).flatMap(vendorStorageKeys));
+    return NextResponse.json({uploads:uploads.filter(upload=>!saved.has(upload.key)).map(({key,...upload})=>upload)},{headers:{'Cache-Control':'private, no-store'}});
+  }catch(error){
+    console.error('Recent uploads lookup failed',error);
+    return fail('Recent uploads are temporarily unavailable. Please try again.',500);
+  }
+}
 
 export async function POST(req:NextRequest){
   try{

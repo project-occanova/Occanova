@@ -26,6 +26,10 @@ export const sendVerificationEmail=(email:string,value:string)=>send(email,'Veri
 Request a new link: ${siteUrl()}/resend-verification
 Already verified? Log in: ${siteUrl()}/login`);
 export const sendResetEmail=(email:string,value:string)=>send(email,'Reset your Occanova password',`<h1>Reset your password</h1><p><a href="${siteUrl()}/reset-password?token=${value}">Choose a new password</a></p><p>This link expires in 30 minutes. Ignore this email if you did not request it.</p>`,`Reset your Occanova password: ${siteUrl()}/reset-password?token=${value}\nThis link expires in 30 minutes.`);
+export function sendMobileChangedEmail(email:string,phone:string){
+ const ending=phone.slice(-4);
+ return send(email,'Your Occanova mobile number was changed',`<h1>Mobile number updated</h1><p>The verified mobile number on your Occanova vendor account now ends in ${esc(ending)}. It is also the public phone number on your listing.</p><p>If you did not make this change, contact <a href="mailto:info@occanova.com">info@occanova.com</a> immediately and reset your password.</p>`,`Your Occanova vendor mobile number now ends in ${ending}. If you did not make this change, contact info@occanova.com immediately and reset your password.`);
+}
 export function sendFirstChargeReminder(email:string,plan:PlanId,date:string){
  const amount=subscriptionPlans[plan].monthlyRupees;
  const day=new Date(date).toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric',timeZone:'Asia/Kolkata'});

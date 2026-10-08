@@ -130,12 +130,12 @@ type PublicDirectoryState=Pick<State,'vendors'|'categories'|'locations'>&{users:
 export const readPublicDirectory=cache(async():Promise<PublicDirectoryState>=>{
   if(!mongoConfigured()){
     const state=await localRead();
-    return {vendors:state.vendors.filter(v=>v.status==='approved'&&v.published),users:state.users.map(({id,subscription})=>({id,subscription})),categories:state.categories,locations:state.locations};
+    return {vendors:state.vendors.filter(v=>(v.status==='approved'&&v.published)||Boolean(v.publishedSnapshot)),users:state.users.map(({id,subscription})=>({id,subscription})),categories:state.categories,locations:state.locations};
   }
   await ensureMongoSeed();
   const {db}=await mongo();
   const [vendorDocs,userDocs,categoryDocs,locationDocs]=await Promise.all([
-    db.collection<MongoDoc>('vendors').find({status:'approved',published:true},{projection:{documents:0,remarks:0}}).toArray(),
+    db.collection<MongoDoc>('vendors').find({$or:[{status:'approved',published:true},{publishedSnapshot:{$exists:true}}]},{projection:{documents:0,remarks:0}}).toArray(),
     db.collection<MongoDoc>('users').find({},{projection:{_id:0,id:1,subscription:1}}).toArray(),
     db.collection<MongoDoc>('categories').find({}).sort({_order:1}).toArray(),
     db.collection<MongoDoc>('locations').find({}).sort({_order:1}).toArray(),
