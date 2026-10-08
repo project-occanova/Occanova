@@ -324,6 +324,7 @@ table{min-width:680px}
 .upload-control{min-height:148px;padding:16px;border:1px solid var(--line);border-radius:5px;background:#fafbf6}
 .upload-control input[type="file"]{padding:9px;background:var(--white);font-size:11px}
 .upload-recovery{margin:16px 0 0 44px;display:grid;justify-items:start;gap:10px;min-width:0}.upload-recovery>.upload-items{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.upload-recovery-item{display:flex;align-items:center;gap:10px;min-width:0;width:100%;padding:10px;border:1px solid var(--line);border-radius:5px;background:#fafbf6}.upload-recovery-item img{width:48px;height:48px;flex:none;object-fit:cover;border-radius:3px}.upload-recovery-item span{flex:1;min-width:0;font-size:12px}.upload-recovery-item .button{flex:none}
+.review-logo{display:inline-block;margin:12px 0 20px;padding:8px;border:1px solid var(--line);border-radius:5px;background:var(--white)}.review-logo img{width:132px;height:132px;object-fit:contain}
 .form-actions{display:flex;align-items:center;justify-content:space-between;gap:24px;padding-top:22px;border-top:1px solid var(--line)}
 .form-actions>span{max-width:430px;font-size:11px;color:var(--muted)}
 .form-actions>div{display:flex;gap:10px;flex-shrink:0}
