@@ -14,7 +14,7 @@ type StateList=keyof State;
 type MongoDoc={_id:string;[key:string]:unknown};
 type MetaDoc={_id:string;revision:number;initializedAt?:Date;seedVersion?:number};
 // Increment when persisted data needs a migration or seed choices need merging.
-const seedVersion=5;
+const seedVersion=6;
 const collections:StateList[]=['vendors','users','registrations','paymentOrders','enquiries','sessions','tokens','categories','locations','audit'];
 const keys:Record<StateList,string>={vendors:'id',users:'id',registrations:'id',paymentOrders:'id',enquiries:'id',sessions:'hash',tokens:'hash',categories:'slug',locations:'slug',audit:'id'};
 
