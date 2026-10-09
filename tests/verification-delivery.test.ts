@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {lookupVerificationDelivery,verificationDelivery} from '../src/lib/verification-delivery';
+import {lookupVerificationDelivery,ResendLookupError,verificationDelivery} from '../src/lib/verification-delivery';
 import {EmailSendError,sendVerificationEmail} from '../src/lib/email';
 
 test('Resend acceptance is distinct from recipient delivery and suppression',()=>{
@@ -18,6 +18,8 @@ test('delivery lookup accepts only the saved recipient and returns no email body
   assert.deepEqual(await lookupVerificationDelivery('email_fixture','vendor@example.com','fixture-key'),verificationDelivery('suppressed'));
   await assert.rejects(lookupVerificationDelivery('../not-an-id','vendor@example.com','fixture-key'),/Invalid provider reference/);
   await assert.rejects(lookupVerificationDelivery('email_fixture','other@example.com','fixture-key'),/did not match this recipient/);
+  globalThis.fetch=async()=>new Response(null,{status:401});
+  await assert.rejects(lookupVerificationDelivery('email_fixture','vendor@example.com','fixture-key'),error=>error instanceof ResendLookupError&&error.status===401);
  }finally{globalThis.fetch=original;}
 });
 
