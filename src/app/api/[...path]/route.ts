@@ -16,13 +16,13 @@ import {billingEnabled,billingMode} from '@/lib/subscriptions';
 import {assertPlanAccess,assertPortfolioLimit,PlanAccessError} from '@/lib/plan-access';
 import {startRegistration} from '@/lib/registration';
 import {registrationCookie,registrationCookieOptions} from '@/lib/registration-session';
-import {matchesLoginIdentity} from '@/lib/login-identity';
+import {matchesLoginIdentity,matchesUnverifiedMobile} from '@/lib/login-identity';
 import {issuePasswordReset,resetAccountPassword,revokePasswordReset} from '@/lib/password-reset';
 import {validationFeedback} from '@/lib/form-feedback';
 import {notifyVendor,reviewNotificationKind,markNotificationsRead} from '@/lib/vendor-notifications';
 import {deliverReviewNotification} from '@/lib/review-delivery';
 import {workspaceVersion} from '@/lib/workspace-version';
-import {emailVerificationStatus,issueEmailVerification,recordVerificationEmail,revokeEmailVerification,verificationRecoveryMessage,verifyEmail} from '@/lib/email-verification';
+import {emailVerificationStatus,issueEmailVerification,recordVerificationEmail,registrationCanResume,revokeEmailVerification,verificationRecoveryMessage,verifyEmail} from '@/lib/email-verification';
 export const runtime='nodejs';
 const fail=(message:string,status=400)=>NextResponse.json({error:message},{status});
 export async function GET(req:NextRequest,{params}:{params:Promise<{path:string[]}>}) {
@@ -102,10 +102,15 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
    if(!user){
     const pending=s.registrations.find(row=>!row.completedUserId&&matchesLoginIdentity(row,v.identity));
     if(!v.admin&&pending&&checkPassword(v.password,pending.passwordHash)){
+     if(!registrationCanResume(pending))return fail('Registration expired. Start a new registration with your email and mobile number.',403);
      if(!pending.verified)return fail('Verify your email before setting up AutoPay.',403);
      if(!billingEnabled())return fail('AutoPay registration is temporarily unavailable.',503);
-     const t=token();await mutate(current=>{const row=current.registrations.find(item=>item.id===pending.id);if(!row)throw Error('Registration expired.');row.sessionHash=digest(t);row.expires=Date.now()+86400000;});
+     const t=token();await mutate(current=>{const row=current.registrations.find(item=>item.id===pending.id&&!item.completedUserId);if(!row||!registrationCanResume(row))throw Error('Registration expired. Start a new registration with your email and mobile number.');row.sessionHash=digest(t);row.expires=Date.now()+86400000;});
      (await cookies()).set(registrationCookie,t,registrationCookieOptions);return NextResponse.json({ok:true,redirect:'/register/complete'});
+    }
+    if(!v.admin){
+     const unverified=[...s.users,...s.registrations.filter(row=>!row.completedUserId)].find(row=>matchesUnverifiedMobile(row,v.identity)&&checkPassword(v.password,row.passwordHash));
+     if(unverified)return fail('Mobile login is available after OTP verification. Sign in with your email and password to continue.',403);
     }
     return fail('Email/mobile or password is incorrect.',401);
    }
@@ -252,7 +257,7 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
   if(e instanceof z.ZodError)return fail(e.issues[0]?validationFeedback(e.issues[0]):'Check the form fields');
   if(e instanceof SyntaxError)return fail('Invalid JSON');
   if(e&&typeof e==='object'&&'code' in e&&e.code===11000)return fail('An account already uses this email or phone.',409);
-  const safe=['Agree to recurring AutoPay','Registration is already in progress','An account already uses','An account or registration already uses','This verification link','Email/mobile or password','Verify your email','This reset link','This vendor is unavailable','This listing does not have','Choose an active','Add the first subcategory','This subcategory already exists','Contact Occanova','Current password','Enquiry not found','Access denied','Administrator access','Use the separate administrator','Vendor not found','Featured end','Private file storage','Choose an allowed','Public registration','Public enquiries','Mobile verification','Mobile number changed','Your account does not have','Too many verification','Too many incorrect','The verification code','The verification message','The mobile verification service','Verify your mobile','Vendor plan authorization','Enter a valid Indian mobile number','This number is already verified','This is already your account number','Start a new mobile number change','Another account now uses'];
+  const safe=['Agree to recurring AutoPay','Registration is already in progress','Registration expired','An account already uses','An account or registration already uses','This verification link','Email/mobile or password','Mobile login is available','Verify your email','This reset link','This vendor is unavailable','This listing does not have','Choose an active','Add the first subcategory','This subcategory already exists','Contact Occanova','Current password','Enquiry not found','Access denied','Administrator access','Use the separate administrator','Vendor not found','Featured end','Private file storage','Choose an allowed','Public registration','Public enquiries','Mobile verification','Mobile number changed','Your account does not have','Too many verification','Too many incorrect','The verification code','The verification message','The mobile verification service','Verify your mobile','Vendor plan authorization','Enter a valid Indian mobile number','This number is already verified','This is already your account number','Start a new mobile number change','Another account now uses'];
   if(e instanceof Error&&safe.some(x=>e.message.startsWith(x)))return fail(e.message);
   console.error('API request failed',e);return fail('Request failed. Please try again.',500);
  }

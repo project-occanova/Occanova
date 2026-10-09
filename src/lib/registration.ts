@@ -3,7 +3,7 @@ import type {PendingRegistration,State,User} from './types';
 import type {PlanId} from './plans';
 import type {RazorpaySubscription} from './subscriptions';
 import {normalizeIndianMobile} from './mobile-otp';
-import {registrationRecoveryExpiry} from './email-verification';
+import {registrationCanResume} from './email-verification';
 
 function sameIdentity(row:{email:string;phone:string},input:{email:string;phone:string}){
  const phone=normalizeIndianMobile(input.phone);
@@ -12,7 +12,7 @@ function sameIdentity(row:{email:string;phone:string},input:{email:string;phone:
 
 export function startRegistration(state:State,input:{email:string;phone:string;passwordHash:string;plan:PlanId;autopayConsent:boolean;verificationHash:string;mobileVerificationRequired:boolean},now=Date.now()){
  if(!input.autopayConsent)throw Error('Agree to recurring AutoPay before continuing.');
- state.registrations=state.registrations.filter(row=>registrationRecoveryExpiry(row)>now||row.subscription?.gatewayId||row.completedUserId);
+ state.registrations=state.registrations.filter(row=>registrationCanResume(row,now)||row.completedUserId);
  if(state.users.some(row=>sameIdentity(row,input)))throw Error('An account already uses this email or phone.');
  if(state.registrations.some(row=>!row.completedUserId&&sameIdentity(row,input)))throw Error('Registration is already in progress. Log in to continue, or resend your verification email.');
  const registration:PendingRegistration={id:randomUUID(),email:input.email,phone:input.phone,passwordHash:input.passwordHash,plan:input.plan,verified:false,mobileVerificationRequired:input.mobileVerificationRequired,verificationHash:input.verificationHash,verificationExpires:now+86400000,recoveryExpires:now+30*86400000,autopayConsentAt:new Date(now).toISOString(),expires:now+86400000};

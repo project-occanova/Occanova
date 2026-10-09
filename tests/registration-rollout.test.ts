@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {initialState} from '../src/lib/seed';
 import {startRegistration,activateRegistration} from '../src/lib/registration';
+import {registrationCanResume} from '../src/lib/email-verification';
 import {registerSchema} from '../src/lib/validation';
 import {workspaceVersion} from '../src/lib/workspace-version';
 import {billingConfigured,billingMode,type RazorpaySubscription} from '../src/lib/subscriptions';
@@ -34,6 +35,13 @@ test('legacy Indian phone formats cannot bypass duplicate signup or mandate acti
 test('pending registration phone formats and mixed-case legacy emails cannot create duplicate setup',()=>{
  const state=initialState();const pending=startRegistration(state,input);pending.phone='98765 43210';pending.email='NEW@Example.com';
  assert.throws(()=>startRegistration(state,input),/already in progress/);assert.equal(state.registrations.length,1);
+});
+test('unfinished setup can resume during recovery, and a gateway mandate is never orphaned',()=>{
+ const now=Date.now(),state=initialState(),pending=startRegistration(state,input,now);
+ assert.equal(registrationCanResume(pending,now+29*86400000),true);
+ assert.equal(registrationCanResume(pending,now+31*86400000),false);
+ pending.subscription={plan:'starter',status:'created',gatewayId:'sub_fixture',gatewayPlanId:'plan_fixture',trialEndsAt:new Date(now+60*86400000).toISOString(),updatedAt:new Date(now).toISOString()};
+ assert.equal(registrationCanResume(pending,now+31*86400000),true);
 });
 test('admin workspace version tracks signup progress without changing another vendor workspace',()=>{
  const state=initialState(),admin={id:'admin',email:'admin@example.com',phone:'',passwordHash:'hash',role:'admin' as const,verified:true},vendor={...admin,id:'vendor',role:'vendor' as const};

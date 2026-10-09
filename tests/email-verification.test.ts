@@ -103,6 +103,7 @@ test('recovery distinguishes verified, unverified, missing and expired registrat
  assert.equal(emailVerificationStatus(state,pending.email,now+31*day),'registration_expired');
  assert.equal(JSON.stringify(state),before);
  pending.verified=true;assert.equal(emailVerificationStatus(state,pending.email,now),'already_verified');
+ assert.equal(emailVerificationStatus(state,pending.email,now+31*day),'registration_expired');
  assert.match(verificationRecoveryMessage('already_verified'),/already verified.*log in/);
  assert.match(verificationRecoveryMessage('not_found'),/No account/);assert.match(verificationRecoveryMessage('registration_expired'),/register again/);
 });

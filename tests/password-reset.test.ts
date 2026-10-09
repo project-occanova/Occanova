@@ -34,3 +34,13 @@ test('password resets expire, reject removed accounts and revoke prior account s
  state.tokens.push({hash:'removed',kind:'reset',userId:'removed-user',expires:now+10000});
  assert.throws(()=>resetAccountPassword(state,'removed','new',now+1),/invalid or expired/);
 });
+test('legacy email casing is accepted and expired unfinished registrations get no unusable reset link',()=>{
+ const state=initialState(),now=Date.now();
+ state.users.push({id:'legacy',email:'Legacy@Example.com',phone:'',passwordHash:'old',role:'vendor',verified:true});
+ assert.equal(issuePasswordReset(state,'legacy@example.com','legacy-link',now),true);
+ const pending=startRegistration(state,{email:'pending@example.com',phone:'+919876543210',passwordHash:'old',plan:'starter',autopayConsent:true,verificationHash:'verify',mobileVerificationRequired:true},now);
+ assert.equal(issuePasswordReset(state,'pending@example.com','expired-link',now+31*86400000),false);
+ assert.equal(state.tokens.some(row=>row.hash==='expired-link'),false);
+ pending.subscription={plan:'starter',status:'created',gatewayId:'sub_fixture',gatewayPlanId:'plan_fixture',trialEndsAt:new Date(now+60*86400000).toISOString(),updatedAt:new Date(now).toISOString()};
+ assert.equal(issuePasswordReset(state,'pending@example.com','mandate-link',now+31*86400000),true);
+});

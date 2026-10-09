@@ -1,7 +1,9 @@
 import type {State} from './types';
+import {registrationCanResume} from './email-verification';
 
 export function issuePasswordReset(state:State,email:string,hash:string,now=Date.now()){
- const account=state.users.find(user=>user.email===email)||state.registrations.find(row=>row.email===email&&!row.completedUserId);
+ const address=email.trim().toLowerCase();
+ const account=state.users.find(user=>user.email.trim().toLowerCase()===address)||state.registrations.find(row=>row.email.trim().toLowerCase()===address&&!row.completedUserId&&registrationCanResume(row,now));
  if(!account)return false;
  // Keep earlier delivered links valid until one is used successfully.
  state.tokens=state.tokens.filter(token=>token.expires>now);
@@ -12,7 +14,7 @@ export function revokePasswordReset(state:State,hash:string){state.tokens=state.
 export function resetAccountPassword(state:State,hash:string,passwordHash:string,now=Date.now()){
  const token=state.tokens.find(row=>row.hash===hash&&row.kind==='reset'&&row.expires>now);
  if(!token)throw Error('This reset link is invalid or expired.');
- const pending=state.registrations.find(row=>row.id===token.userId&&!row.completedUserId);
+ const pending=state.registrations.find(row=>row.id===token.userId&&!row.completedUserId&&registrationCanResume(row,now));
  const account=state.users.find(user=>user.id===token.userId)||pending;
  if(!account)throw Error('This reset link is invalid or expired.');
  account.passwordHash=passwordHash;

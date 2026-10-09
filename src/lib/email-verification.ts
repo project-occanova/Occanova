@@ -4,6 +4,9 @@ const day=86400000;
 export function registrationRecoveryExpiry(row:PendingRegistration){
  return row.recoveryExpires??row.expires+30*day;
 }
+export function registrationCanResume(row:PendingRegistration,now=Date.now()){
+ return registrationRecoveryExpiry(row)>now||Boolean(row.subscription?.gatewayId);
+}
 
 export type EmailVerificationStatus='unverified'|'already_verified'|'not_found'|'registration_expired';
 export function emailVerificationStatus(state:State,email:string,now=Date.now()):EmailVerificationStatus{
@@ -12,8 +15,8 @@ export function emailVerificationStatus(state:State,email:string,now=Date.now())
  if(user)return user.verified?'already_verified':'unverified';
  const pending=state.registrations.find(row=>row.email.trim().toLowerCase()===address&&!row.completedUserId);
  if(!pending)return 'not_found';
- if(pending.verified)return 'already_verified';
- return registrationRecoveryExpiry(pending)>now?'unverified':'registration_expired';
+ if(!registrationCanResume(pending,now))return 'registration_expired';
+ return pending.verified?'already_verified':'unverified';
 }
 
 export function verificationRecoveryMessage(status:Exclude<EmailVerificationStatus,'unverified'>){
