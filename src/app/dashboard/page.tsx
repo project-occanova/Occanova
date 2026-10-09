@@ -24,6 +24,7 @@ export default async function Dashboard(){
   const user=await currentUser();
   if(!user)redirect('/login');
   if(user.role==='admin')redirect('/admin');
+  if(user.role==='customer')redirect('/customer');
   const s=await readState();
   const v=s.vendors.find(x=>x.userId===user.id);
   const enquiries=s.enquiries.filter(x=>x.vendorId===v?.id);

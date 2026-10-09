@@ -8,7 +8,7 @@ import { registerSchema,enquirySchema,profileSchema,draftProfileSchema,adminVend
 import { slugify,publicVendors,publicVendorProfile,snapshotPublishedVendor } from '@/lib/directory';
 import {backendReady,hasDatabase,hasEmail,hasMobileOtp,hasStorage,localPreview,mobileOtpEnabled,publicIntakeEnabled,readOnlyDeployment} from '@/lib/config';
 import {rateLimited} from '@/lib/rate-limit';
-import {EmailSendError,sendEnquiryNotifications,sendMobileChangedEmail,sendResetEmail,sendVerificationEmail} from '@/lib/email';
+import {EmailSendError,sendCustomerVerificationEmail,sendEnquiryNotifications,sendMobileChangedEmail,sendResetEmail,sendVerificationEmail} from '@/lib/email';
 import {cleanupOrphanedUploads,createDownload,validVendorKey,vendorStorageKeys} from '@/lib/storage';
 import {MobileOtpDeliveryError,normalizeIndianMobile,saveMobileChallenge,sendMobileOtp} from '@/lib/mobile-otp';
 import {mobileVerificationTarget,stageAccountPhone,verifyAccountPhone} from '@/lib/account-phone';
@@ -16,6 +16,7 @@ import {billingEnabled,billingMode} from '@/lib/subscriptions';
 import {assertPlanAccess,assertPortfolioLimit,PlanAccessError} from '@/lib/plan-access';
 import {startRegistration} from '@/lib/registration';
 import {registrationCookie,registrationCookieOptions} from '@/lib/registration-session';
+import {customerSetupCookie} from '@/lib/customer-session';
 import {matchesLoginIdentity,matchesUnverifiedMobile} from '@/lib/login-identity';
 import {issuePasswordReset,resetAccountPassword,revokePasswordReset} from '@/lib/password-reset';
 import {validationFeedback} from '@/lib/form-feedback';
@@ -115,23 +116,25 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
     return fail('Email/mobile or password is incorrect.',401);
    }
    if(!checkPassword(v.password,user.passwordHash))return fail('Email/mobile or password is incorrect.',401);
-   if(!portalAllowed(user.role,v.admin))return fail(v.admin?'Administrator access is required.':'Use the separate administrator sign-in page.',403);
+   if(!portalAllowed(user.role,v.admin))return fail(v.admin?'Administrator access is required.':user.role==='customer'?'Use the customer sign-in page.':'Use the separate administrator sign-in page.',403);
    if(!user.verified)return fail('Verify your email before signing in.',403);
    const vendor=user.role==='vendor'?s.vendors.find(x=>x.userId===user.id):undefined;
    if(vendor?.status==='inactive'||vendor?.status==='suspended')return fail('This vendor account is inactive. Contact Occanova support.',403);
    const t=token();await mutate(s=>{s.sessions=s.sessions.filter(x=>x.expires>Date.now());s.sessions.push({hash:digest(t),userId:user.id,expires:Date.now()+7*86400000});});(await cookies()).set('occanova_session',t,cookieOptions);return NextResponse.json({ok:true,redirect:user.role==='admin'?'/admin':'/dashboard'});
   }
-  if(route==='auth/logout'){const value=(await cookies()).get('occanova_session')?.value;await mutate(s=>{s.sessions=s.sessions.filter(x=>x.hash!==digest(value??''));});(await cookies()).delete('occanova_session');(await cookies()).delete(registrationCookie);return NextResponse.json({ok:true});}
+  if(route==='auth/logout'){const jar=await cookies(),value=jar.get('occanova_session')?.value,setup=jar.get(customerSetupCookie)?.value;await mutate(s=>{s.sessions=s.sessions.filter(x=>x.hash!==digest(value??''));s.tokens=s.tokens.filter(x=>!(x.kind==='customer-setup'&&x.hash===digest(setup??'')));});jar.delete('occanova_session');jar.delete(registrationCookie);jar.delete(customerSetupCookie);return NextResponse.json({ok:true});}
   if(route==='auth/forgot') {
    if(!hasEmail()&&!localPreview())return fail('Password reset email is not available yet. Please contact Occanova support.',503);
    const email=z.string().trim().email().max(160).transform(x=>x.toLowerCase()).parse(b.email);const t=token();const hash=digest(t);
    const found=await mutate(s=>issuePasswordReset(s,email,hash));
-   if(found)try{await sendResetEmail(email,t);}catch{await mutate(s=>revokePasswordReset(s,hash));return fail('We could not send the reset email. Any earlier unexpired reset link still works. Check your inbox and spam folder, or try again later.',503);}
-   return NextResponse.json({ok:true,message:'If an account or unfinished registration exists for this email, a password reset link has been sent. Check your inbox and spam folder. The link works for 30 minutes.',verificationUrl:found&&localPreview()?`/reset-password?token=${t}`:undefined});
+   const recipient=found?(await readState()).users.find(user=>user.email.trim().toLowerCase()===email):undefined;
+   const resetPortal=recipient?.role==='customer'?'customer':'vendor';
+   if(found)try{await sendResetEmail(email,t,resetPortal);}catch{await mutate(s=>revokePasswordReset(s,hash));return fail('We could not send the reset email. Any earlier unexpired reset link still works. Check your inbox and spam folder, or try again later.',503);}
+   return NextResponse.json({ok:true,message:'If an account or unfinished registration exists for this email, a password reset link has been sent. Check your inbox and spam folder. The link works for 30 minutes.',verificationUrl:found&&localPreview()?`/reset-password?token=${t}&portal=${resetPortal}`:undefined});
   }
   if(route==='auth/resend'||route==='auth/verification-status') {
    const email=z.string().trim().email().max(160).transform(x=>x.toLowerCase()).parse(b.email);const t=token();const hash=digest(t);
-   const status= emailVerificationStatus(await readState(),email);
+   const state=await readState();const status=emailVerificationStatus(state,email);const customer=state.users.some(row=>row.role==='customer'&&row.email.trim().toLowerCase()===email);
    if(route==='auth/verification-status')return NextResponse.json({ok:true,status,message:status==='unverified'?'Your email is not verified yet. Request a verification link to continue.':verificationRecoveryMessage(status)});
    if(status!=='unverified')return NextResponse.json({ok:true,status,message:verificationRecoveryMessage(status)});
    if(!hasEmail()&&!localPreview())return fail('Verification email is temporarily unavailable. Please try again later or contact info@occanova.com.',503);
@@ -139,19 +142,20 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
    const outcome=await mutate(s=>{const now=Date.now();const current=emailVerificationStatus(s,email,now);if(current==='unverified')issueEmailVerification(s,email,hash,now);return current;});
    if(outcome!=='unverified')return NextResponse.json({ok:true,status:outcome,message:verificationRecoveryMessage(outcome)});
    const attemptedAt=new Date().toISOString();let providerId:string|undefined;
-   try{providerId=await sendVerificationEmail(email,t);}catch(error){
+   try{providerId=await (customer?sendCustomerVerificationEmail(email,t):sendVerificationEmail(email,t));}catch(error){
     const failure=error instanceof EmailSendError?error:new EmailSendError('Email send failed.','transport');
     console.error('Resent verification email failed:',failure.source,failure.httpStatus||'no HTTP status');
     await mutate(s=>{revokeEmailVerification(s,hash);recordVerificationEmail(s,email,{status:'failed',attemptedAt,failureSource:failure.source,httpStatus:failure.httpStatus});});
     return fail('We could not send the verification email. Any earlier unexpired link still works. Please try again later or contact info@occanova.com.',503);
    }
    after(async()=>{try{await mutate(s=>recordVerificationEmail(s,email,{status:'accepted',attemptedAt,providerId}));}catch{console.error('Verification email tracking could not be saved.');}});
-   return NextResponse.json({ok:true,status:hasEmail()?'sent':'preview',message:hasEmail()?`Our email provider accepted a new verification message for ${email}. Check Inbox, Spam and Promotions. Acceptance does not guarantee inbox delivery; if it does not arrive, contact info@occanova.com.`:'A verification link is ready in this local preview. No email was sent.',verificationUrl:localPreview()?`/verify?token=${t}`:undefined});
+   return NextResponse.json({ok:true,status:hasEmail()?'sent':'preview',message:hasEmail()?`Our email provider accepted a new verification message for ${email}. Check Inbox, Spam and Promotions. Acceptance does not guarantee inbox delivery; if it does not arrive, contact info@occanova.com.`:'A verification link is ready in this local preview. No email was sent.',verificationUrl:localPreview()?`${customer?'/customer':''}/verify?token=${t}`:undefined});
   }
   if(route==='auth/reset'){const v=z.object({token:z.string().length(64),password:z.string().min(10).max(128)}).parse(b);await mutate(s=>resetAccountPassword(s,digest(v.token),hashPassword(v.password)));return NextResponse.json({ok:true});}
-  if(route==='enquiries') {const v=enquirySchema.parse(b);const saved=await mutate(s=>{const vendor=publicVendors(s.vendors,{},s.users).find(x=>x.id===v.vendorId&&!x.sample);if(!vendor)throw Error('This vendor is unavailable.');const {website,...data}=v;void website;const enquiry={...data,id:randomUUID(),status:'new' as const,createdAt:new Date().toISOString()};s.enquiries.push(enquiry);return {enquiry,vendor};});let delivered=true;try{await sendEnquiryNotifications(saved.enquiry,saved.vendor);}catch{delivered=false;}return NextResponse.json({ok:true,id:saved.enquiry.id,message:localPreview()?'Enquiry saved in this local preview. No notification was sent.':delivered?'Your enquiry has been sent to the vendor.':'Your enquiry was saved. The email notification is delayed.'});}
+  if(route==='enquiries') {const v=enquirySchema.parse(b),account=await currentUser(),customerId=account?.role==='customer'&&account.verified&&account.phoneVerified?account.id:undefined;const saved=await mutate(s=>{const vendor=publicVendors(s.vendors,{},s.users).find(x=>x.id===v.vendorId&&!x.sample);if(!vendor)throw Error('This vendor is unavailable.');const {website,...data}=v;void website;const enquiry={...data,id:randomUUID(),customerId,status:'new' as const,createdAt:new Date().toISOString()};s.enquiries.push(enquiry);return {enquiry,vendor};});let delivered=true;try{await sendEnquiryNotifications(saved.enquiry,saved.vendor);}catch{delivered=false;}return NextResponse.json({ok:true,id:saved.enquiry.id,customerLinked:Boolean(customerId),message:localPreview()?'Enquiry saved in this local preview. No notification was sent.':delivered?'Your enquiry has been sent to the vendor.':'Your enquiry was saved. The email notification is delayed.'});}
   const user=await currentUser();if(!user)return fail('Please sign in.',401);
   if(route==='notifications/read'){
+   if(user.role!=='vendor')return fail('Vendor access required',403);
    const {ids}=z.object({ids:z.array(z.string().uuid()).min(1).max(30)}).parse(b);
    await mutate(state=>{const owner=state.users.find(row=>row.id===user.id);if(!owner)throw Error('Access denied');markNotificationsRead(owner,ids);});
    return NextResponse.json({ok:true});
@@ -257,7 +261,7 @@ export async function POST(req:NextRequest,{params}:{params:Promise<{path:string
   if(e instanceof z.ZodError)return fail(e.issues[0]?validationFeedback(e.issues[0]):'Check the form fields');
   if(e instanceof SyntaxError)return fail('Invalid JSON');
   if(e&&typeof e==='object'&&'code' in e&&e.code===11000)return fail('An account already uses this email or phone.',409);
-  const safe=['Agree to recurring AutoPay','Registration is already in progress','Registration expired','An account already uses','An account or registration already uses','This verification link','Email/mobile or password','Mobile login is available','Verify your email','This reset link','This vendor is unavailable','This listing does not have','Choose an active','Add the first subcategory','This subcategory already exists','Contact Occanova','Current password','Enquiry not found','Access denied','Administrator access','Use the separate administrator','Vendor not found','Featured end','Private file storage','Choose an allowed','Public registration','Public enquiries','Mobile verification','Mobile number changed','Your account does not have','Too many verification','Too many incorrect','The verification code','The verification message','The mobile verification service','Verify your mobile','Vendor plan authorization','Enter a valid Indian mobile number','This number is already verified','This is already your account number','Start a new mobile number change','Another account now uses'];
+  const safe=['Agree to recurring AutoPay','Registration is already in progress','Registration expired','An account already uses','An account or registration already uses','This verification link','Email/mobile or password','Mobile login is available','Verify your email','This reset link','This vendor is unavailable','This listing does not have','Choose an active','Add the first subcategory','This subcategory already exists','Contact Occanova','Current password','Enquiry not found','Access denied','Administrator access','Use the separate administrator','Use the customer sign-in page','Vendor not found','Featured end','Private file storage','Choose an allowed','Public registration','Public enquiries','Mobile verification','Mobile number changed','Your account does not have','Too many verification','Too many incorrect','The verification code','The verification message','The mobile verification service','Verify your mobile','Vendor plan authorization','Enter a valid Indian mobile number','This number is already verified','This is already your account number','Start a new mobile number change','Another account now uses'];
   if(e instanceof Error&&safe.some(x=>e.message.startsWith(x)))return fail(e.message);
   console.error('API request failed',e);return fail('Request failed. Please try again.',500);
  }

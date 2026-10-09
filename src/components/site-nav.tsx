@@ -6,7 +6,7 @@ import {ArrowUpRight,Menu,X} from 'lucide-react';
 
 const links=[
   {href:'/vendors',label:'Find vendors'},
-  {href:'/#how-it-works',label:'How it works'},
+  {href:'/customer',label:'Customer account'},
   {href:'/register',label:'List your business'},
   {href:'/login',label:'Vendor login',className:'mobile-login'},
 ];

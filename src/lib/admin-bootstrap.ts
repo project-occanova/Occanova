@@ -10,7 +10,7 @@ export async function ensureConfiguredAdmin(){
   if(current)return current.role==='admin';
   await mutate(state=>{
     const existing=state.users.find(user=>user.email===email);
-    if(existing){if(existing.role!=='admin')throw Error('The configured administrator email belongs to a vendor account.');return;}
+    if(existing){if(existing.role!=='admin')throw Error('The configured administrator email belongs to another account.');return;}
     state.users.push({id:randomUUID(),email,phone:'',passwordHash:hashPassword(password),verified:true,role:'admin'});
     state.audit.unshift({id:randomUUID(),actor:email,action:'Administrator account provisioned',target:email,remarks:'Created from the protected production configuration',at:new Date().toISOString()});
   });

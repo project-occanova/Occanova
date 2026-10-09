@@ -18,7 +18,7 @@ export function Header(){
     <Brand/>
     <nav className="desktop-nav" aria-label="Main navigation">
       <Link href="/vendors">Find vendors</Link>
-      <Link href="/#how-it-works" prefetch={false}>How it works</Link>
+      <Link href="/customer">Customer account</Link>
       <Link href="/register">List your business <ArrowUpRight size={15}/></Link>
       <Link className="button outline small" href="/login">Vendor login</Link>
     </nav>
@@ -30,7 +30,7 @@ export function Footer(){
   return <footer>
     <div className="container footer-main">
       <div><Brand/><p>Good people. Beautiful celebrations across India.</p></div>
-      <div><strong>Explore</strong><Link href="/vendors">Find vendors</Link><Link href="/#how-it-works" prefetch={false}>How it works</Link></div>
+      <div><strong>Explore</strong><Link href="/vendors">Find vendors</Link><Link href="/customer">Customer account</Link><Link href="/#how-it-works" prefetch={false}>How it works</Link></div>
       <div><strong>For businesses</strong><Link href="/register">List your business</Link><Link href="/login">Vendor login</Link></div>
       <div><strong>Occanova</strong><Link href="/privacy">Privacy policy</Link><Link href="/terms">Terms & conditions</Link><Link href="/terms#cancellation-refunds">Cancellation & refunds</Link><a href="mailto:info@occanova.com">Contact support</a></div>
     </div>

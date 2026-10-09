@@ -39,6 +39,6 @@ export function VendorLoginForm({initialEmail=''}:{initialEmail?:string}){
    {recovery&&<div className={['not_found','registration_expired'].includes(recovery.status)?'notice':'success'} role="status"><p>{recovery.message}</p>{recovery.status==='already_verified'&&<button className="button outline" type="button" onClick={()=>password.current?.focus()}>Continue with login</button>}{['not_found','registration_expired'].includes(recovery.status)&&<Link href="/register">Start vendor registration</Link>}{recovery.verificationUrl&&<Link href={recovery.verificationUrl}>Open verification link</Link>}</div>}
    <p className="quiet-note">Use your email until your mobile number is verified. Password reset links and notifications go to your email. For help, <a href="mailto:info@occanova.com">contact Occanova support</a>.</p>
   </div>
-  <p className="auth-bottom">New to Occanova? <Link href="/register">List your business</Link></p>
+  <p className="auth-bottom">New vendor? <Link href="/register">List your business</Link> · Looking for vendors? <Link href="/customer/login">Customer login</Link></p>
  </div>;
 }

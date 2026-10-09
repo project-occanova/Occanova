@@ -6,10 +6,10 @@ import {authRequest} from '@/lib/auth-request';
 import {SubmitForm} from './submit-form';
 import {AuthProgress} from './auth-progress';
 
-export function PasswordRecoveryForm({mode,token,initialEmail=''}:{mode:'forgot'|'reset';token?:string;initialEmail?:string}){
+export function PasswordRecoveryForm({mode,token,initialEmail='',portal='vendor'}:{mode:'forgot'|'reset';token?:string;initialEmail?:string;portal?:'vendor'|'customer'}){
  const lock=useRef(false);const[busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState(''),[preview,setPreview]=useState(''),[show,setShow]=useState(false),[expired,setExpired]=useState(false),[email,setEmail]=useState(initialEmail);
- const valid=Boolean(token&&/^[a-f0-9]{64}$/.test(token));const login=email?`/login?email=${encodeURIComponent(email)}`:'/login';
- if(mode==='reset'&&(!valid||expired))return <div className="password-recovery-flow"><p className="notice" role="status">{error||'This reset link is missing or incomplete. Request a new link using your registered email.'}</p><h3>Request a fresh reset link</h3><PasswordRecoveryForm mode="forgot" initialEmail={initialEmail}/></div>;
+ const valid=Boolean(token&&/^[a-f0-9]{64}$/.test(token));const loginBase=portal==='customer'?'/customer/login':'/login';const login=email?`${loginBase}?email=${encodeURIComponent(email)}`:loginBase;
+ if(mode==='reset'&&(!valid||expired))return <div className="password-recovery-flow"><p className="notice" role="status">{error||'This reset link is missing or incomplete. Request a new link using your registered email.'}</p><h3>Request a fresh reset link</h3><PasswordRecoveryForm mode="forgot" initialEmail={initialEmail} portal={portal}/></div>;
  return <div className="password-recovery-flow">
   {success?<div className="success-state" role="status"><CheckCircle2 size={30}/><p>{success}</p>{preview&&<Link className="button" href={preview}>Open reset link</Link>}<Link className="button" href={login}>Back to login</Link>{mode==='forgot'&&<><p className="quiet-note">Email can take a few minutes to arrive. A new request will not cancel an earlier unexpired link.</p><button className="button outline" onClick={()=>{setSuccess('');setPreview('');}}>Request another reset link</button></>}</div>:<SubmitForm className="stack-form" onEdit={()=>setError('')} onSubmit={async event=>{
    event.preventDefault();if(lock.current)return;const data=new FormData(event.currentTarget);

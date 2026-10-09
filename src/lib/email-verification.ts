@@ -20,7 +20,7 @@ export function emailVerificationStatus(state:State,email:string,now=Date.now())
 }
 
 export function verificationRecoveryMessage(status:Exclude<EmailVerificationStatus,'unverified'>){
- return {already_verified:'Your email is already verified. You can log in now. If AutoPay setup is unfinished, logging in will let you complete it.',not_found:'No account or unfinished registration was found for this email address. Check the spelling and use the email you registered with. If an earlier registration expired, start a new registration.',registration_expired:'Your unfinished registration has expired. Please register again to receive a new verification email.'}[status];
+ return {already_verified:'Your email is already verified. You can log in now to continue.',not_found:'No account or unfinished registration was found for this email address. Check the spelling and use the email you registered with. If an earlier registration expired, start a new registration.',registration_expired:'Your unfinished registration has expired. Please register again to receive a new verification email.'}[status];
 }
 
 export function recordVerificationEmail(state:State,email:string,delivery:VerificationEmail){
