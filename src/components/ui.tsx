@@ -38,15 +38,16 @@ export function Footer(){
   </footer>;
 }
 
-export function VendorCard({vendor:v,list=false}:{vendor:Vendor;list?:boolean}){
+export function VendorCard({vendor:v,list=false,hrefBase='/vendors'}:{vendor:Vendor;list?:boolean;hrefBase?:string}){
+  const href=`${hrefBase}/${v.slug}`;
   return <article className={`vendor-card ${list?'list-card':''}`}>
-    <Link className="card-image" href={`/vendors/${v.slug}`}><img src={v.image||'/occanova-logo.jpg'} alt={v.sample?`${v.category} inspiration photograph`:`${v.name} portfolio`} loading="lazy"/>{isFeatured(v)?<span className="badge featured"><Sparkles size={12}/>Featured</span>:null}</Link>
+    <Link className="card-image" href={href}><img src={v.image||'/occanova-logo.jpg'} alt={v.sample?`${v.category} inspiration photograph`:`${v.name} portfolio`} loading="lazy"/>{isFeatured(v)?<span className="badge featured"><Sparkles size={12}/>Featured</span>:null}</Link>
     <div className="card-copy">
       <span className="category-label">{v.category}</span><span className="subcategory-label">{v.service}</span>
-      <Link href={`/vendors/${v.slug}`}><h3>{v.name}{v.sample?null:<BadgeCheck size={17}/>}</h3></Link>
+      <Link href={href}><h3>{v.name}{v.sample?null:<BadgeCheck size={17}/>}</h3></Link>
       <p className="location"><MapPin size={14}/>{v.city}{v.sample?<span className="sample-label">Sample listing</span>:null}</p>
       {list?<p>{v.summary}</p>:null}
-      <div className="card-bottom"><span>From <strong>{money(v.price)}</strong><small>{v.category==='Catering & Food'?' / person':''}</small></span><Link href={`/vendors/${v.slug}`} aria-label={`View ${v.name}`}><ArrowUpRight size={20}/></Link></div>
+      <div className="card-bottom"><span>From <strong>{money(v.price)}</strong><small>{v.category==='Catering & Food'?' / person':''}</small></span><Link href={href} aria-label={`View ${v.name}`}><ArrowUpRight size={20}/></Link></div>
     </div>
   </article>;
 }
