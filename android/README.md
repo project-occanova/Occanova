@@ -30,6 +30,8 @@ The script builds, signs and verifies `app-release-signed.apk` for sideload test
 
 ## Before Play Store release
 
+Use [PLAY_STORE.md](PLAY_STORE.md) for the first internal-test checklist and store listing draft.
+
 1. Back up the ignored keystore and password file securely. Verify the final package ID, version code, target SDK, app icon and Play Console listing.
 2. After Play App Signing is set up, add the **Play app-signing certificate** SHA-256 fingerprint to `../public/.well-known/assetlinks.json` alongside the current upload-key fingerprint. Google Play may sign installed APKs with a different certificate.
 3. Verify full-screen launch, navigation and enquiries on a physical Android device, then complete Play Console's data-safety, content, privacy and testing requirements. Review billing rules before adding paid digital features to the Android app.
