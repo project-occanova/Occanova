@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "sha256_cert_fingerprints": [
+        "62:60:1B:23:59:AD:53:A7:6B:35:E7:D2:B4:A2:B3:34:B7:0B:22:D2:44:4A:ED:18:A0:BC:7F:DE:7A:8D:26:9F"
+      ],
+      "package_name": "com.occanova.app"
+    }
+  }
+]
