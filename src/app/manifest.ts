@@ -3,11 +3,11 @@ import type {MetadataRoute} from 'next';
 export default function manifest():MetadataRoute.Manifest{
  return {
   id:'/app',
-  name:'Occanova — Find event vendors',
+  name:'Occanova — Event vendors and accounts',
   short_name:'Occanova',
-  description:'Discover event professionals across India and enquire directly.',
+  description:'Discover event professionals, save vendors and manage your Occanova account.',
   start_url:'/app',
-  scope:'/app',
+  scope:'/',
   display:'standalone',
   background_color:'#fffcf5',
   theme_color:'#315b1c',

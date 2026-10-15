@@ -707,7 +707,7 @@ table{min-width:680px}
  .customer-search button{min-width:68px}
 }
 
-/* Customer discovery app. Its navigation stays within the payment-free /app scope. */
+/* Android app discovery and account entry. */
 .app-shell{min-height:100dvh;background:var(--ivory)}
 .app-header{position:sticky;top:0;z-index:60;border-bottom:1px solid var(--line);background:#fffcf5f2;backdrop-filter:blur(12px)}
 .app-header-inner,.app-main,.app-footer{width:min(1180px,calc(100% - 64px));margin-inline:auto}
@@ -715,7 +715,7 @@ table{min-width:680px}
 .app-brand{display:inline-flex;align-items:center;gap:10px;color:var(--green);font-family:Manrope,var(--sans);font-size:20px;font-weight:800;letter-spacing:.14em;line-height:1.1}
 .app-brand small{display:block;margin-top:5px;font:600 8px/1.4 var(--sans);letter-spacing:.23em}
 .app-brand-mark{display:block;width:46px;height:46px;overflow:hidden;flex:0 0 46px;border-radius:12px;background:var(--white)}
-.app-brand-mark img{width:100%;height:100%;object-fit:cover;object-position:center 30%;transform:scale(1.65)}
+.app-brand-mark img{width:100%;height:100%;object-fit:cover;transform:translateY(10px) scale(2.3)}
 .app-top-nav{display:flex;align-items:center;gap:26px;font-size:13px;font-weight:700}
 .app-top-nav a:last-child{display:inline-flex;align-items:center;gap:8px;padding:11px 16px;border:1px solid #b6c4a9;border-radius:6px;color:var(--green)}
 .app-top-nav a:hover{color:#648546}
@@ -754,6 +754,12 @@ table{min-width:680px}
 .app-footer>div{display:flex;flex-wrap:wrap;gap:8px 22px}
 .app-footer a:hover{text-decoration:underline;color:var(--green)}
 .app-bottom-nav{display:none}
+.app-account-page{min-height:calc(100dvh - 190px)}
+.app-account-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:30px 0}
+.app-account-card{display:flex;flex-direction:column;align-items:flex-start;min-width:0;min-height:220px;padding:27px;border:1px solid #dfe5d7;border-radius:13px;background:var(--white);color:var(--green)}
+.app-account-card>svg{color:#6d8959}.app-account-card h2{margin:18px 0 7px;font-size:26px}.app-account-card p{font-size:13px;line-height:1.6}.app-account-card>span{display:inline-flex;align-items:center;gap:7px;margin-top:auto;padding-top:22px;font-size:12px;font-weight:700}
+.app-account-card:hover{border-color:#9cad8c;background:#f8faf5}.app-account-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:auto;padding-top:20px}.app-account-actions .button{min-height:43px;font-size:12px}
+.app-account-help{font-size:12px}.app-account-help a{text-decoration:underline;color:var(--green)}
 .app-back{display:inline-flex;align-items:center;gap:7px;color:var(--green);font-size:12px;font-weight:700}
 .app-page-heading{margin:23px 0 28px}
 .app-page-heading h1{margin:9px 0;font-size:clamp(39px,5vw,59px)}
@@ -784,6 +790,7 @@ table{min-width:680px}
  .app-hero{grid-template-columns:minmax(0,1fr) 32%}.app-hero-copy{padding:34px}.app-hero h1{font-size:clamp(42px,5vw,60px)}
  .app-category-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.app-vendor-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
  .app-filter-panel .filter-form{grid-template-columns:repeat(2,minmax(0,1fr))}.app-profile-body{grid-template-columns:minmax(0,1fr) minmax(260px,.8fr);gap:25px}
+ .app-account-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:680px){
  .app-header-inner,.app-main,.app-footer{width:calc(100% - 32px)}.app-header-inner{min-height:68px}.app-brand{font-size:17px}.app-brand small{font-size:7px}.app-brand-mark{width:40px;height:40px;flex-basis:40px}.app-top-nav{display:none}
@@ -793,8 +800,9 @@ table{min-width:680px}
  .app-section{padding-top:47px}.app-section-heading{align-items:start}.app-section-heading h2{font-size:31px}.app-section-heading>a{font-size:11px}.app-category-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.app-category-grid>a{min-height:88px;padding:12px;gap:8px;align-items:flex-start;flex-direction:column}.app-category-grid>a>span{font-size:11px}.app-category-grid>a>svg:last-child{display:none}
  .app-vendor-grid{grid-template-columns:1fr;gap:16px}.app-next-step{flex-direction:column;align-items:start;margin-top:40px;padding:27px 22px}.app-next-step .button{width:100%}
  .app-footer{align-items:flex-start;flex-direction:column;gap:14px;padding-bottom:calc(92px + env(safe-area-inset-bottom))}
- .app-bottom-nav{position:fixed;inset:auto 0 0;z-index:70;display:grid;grid-template-columns:1fr 1fr;padding:7px 12px calc(7px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:#fffcf5f5;backdrop-filter:blur(12px);box-shadow:0 -8px 25px #20351c10}
+ .app-bottom-nav{position:fixed;inset:auto 0 0;z-index:70;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:7px 12px calc(7px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:#fffcf5f5;backdrop-filter:blur(12px);box-shadow:0 -8px 25px #20351c10}
  .app-bottom-nav a{display:grid;place-items:center;gap:2px;min-height:50px;color:var(--green);font-size:11px;font-weight:700}
+ .app-account-grid{grid-template-columns:1fr;gap:12px;margin:20px 0}.app-account-card{min-height:0;padding:21px}.app-account-card h2{font-size:24px}.app-account-card>span{padding-top:15px}
  .app-page-heading{margin:19px 0 23px}.app-page-heading h1{font-size:42px}.app-filter-panel{padding:14px}.app-filter-panel .filter-form{grid-template-columns:1fr;gap:10px}.app-filter-panel .filter-form .button{width:100%}
  .app-empty{padding:25px 20px}.app-profile-heading{align-items:start;flex-direction:column;gap:12px}.app-price{width:100%}.app-profile-body{grid-template-columns:1fr;gap:30px;margin-top:28px}.app-profile-body h2{font-size:31px}.app-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.app-contact-actions{display:grid;grid-template-columns:1fr 1fr}.app-contact-actions .button{padding:12px 8px;font-size:11px;white-space:normal}
 }
