@@ -7,3 +7,11 @@ node_modules/
 data/
 *.log
 tsconfig.tsbuildinfo
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/*.keystore
+android/*.jks
+android/*.apk
+android/*.aab
