@@ -43,7 +43,7 @@ export function CustomerLoginForm({initialEmail='',next=''}:{initialEmail?:strin
  const router=useRouter(),lock=useRef(false),[busy,setBusy]=useState(false),[show,setShow]=useState(false),[error,setError]=useState(''),[identity,setIdentity]=useState(initialEmail);
  return <SubmitForm className="stack-form" onEdit={()=>setError('')} onSubmit={async event=>{
   event.preventDefault();if(lock.current)return;lock.current=true;setBusy(true);setError('');
-  try{const result=await request('login',Object.fromEntries(new FormData(event.currentTarget)));router.push(result.redirect==='/customer'&&next.startsWith('/vendors/')?next:result.redirect);router.refresh();}
+  try{const result=await request('login',Object.fromEntries(new FormData(event.currentTarget)));router.push(result.redirect==='/customer'&&(next.startsWith('/vendors/')||next.startsWith('/app/vendors/'))?next:result.redirect);router.refresh();}
   catch(reason){setError((reason as Error).message);}finally{lock.current=false;setBusy(false);}
  }}>
   <label className="field"><span>Email or verified mobile number</span><input name="identity" value={identity} onChange={event=>setIdentity(event.target.value)} autoComplete="username" maxLength={160} required/></label>
