@@ -1,6 +1,6 @@
 # Occanova Android
 
-This is the Android application for Occanova, package `com.occanova.app`. It opens `https://www.occanova.com/app` as a Trusted Web Activity. Version 0.2 adds an Account area for customer signup, email and mobile verification, login, saved vendors, enquiries, and customer dashboard access. Vendors can open their existing login, registration and studio on the same domain. These are the website's existing account flows, so users keep the same credentials and data.
+This is the Android application for Occanova, package `com.occanova.app`. It opens `https://www.occanova.com/app` as a Trusted Web Activity. Version 0.3 includes the improved mobile vendor directory, quick contact actions and vendor shortlisting alongside customer signup, verification, login and dashboard access. Vendors can open their existing login, registration and studio on the same domain. These are the website's existing account flows, so users keep the same credentials and data.
 
 The web manifest and Android scope cover the whole verified `www.occanova.com` origin, allowing account and dashboard routes to remain in the app. Third-party pages such as payment authorization may open browser UI. The app still requires an internet connection.
 
@@ -28,7 +28,7 @@ cd android
 .\build-release.ps1
 ```
 
-The script builds, signs and verifies `app-release-signed.apk` for sideload testing and `app-release-bundle.aab` for Play Console. They are ignored by Git. The APK's certificate fingerprint is published in `../public/.well-known/assetlinks.json`, allowing this sideloaded release app to verify ownership of `www.occanova.com`. Version code 2 upgrades the earlier test APK without removing its data.
+The script builds, signs and verifies `app-release-signed.apk` for sideload testing and `app-release-bundle.aab` for Play Console. They are ignored by Git. The APK's certificate fingerprint is published in `../public/.well-known/assetlinks.json`, allowing this sideloaded release app to verify ownership of `www.occanova.com`. Version code 3 upgrades the earlier 0.2 APK without removing its data.
 
 ## Before Play Store release
 

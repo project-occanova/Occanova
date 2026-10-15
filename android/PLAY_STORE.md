@@ -1,6 +1,6 @@
 # Occanova Android: Play release preparation
 
-The current sideload build opens `https://www.occanova.com/app`. It includes customer account entry and access to the website's existing customer and vendor routes. **Do not submit version 0.2 to Play yet:** vendor registration leads to Razorpay AutoPay for a platform subscription. Google Play's Payments policy may require Play Billing or an enrolled alternative-billing program for this flow. Settle that flow and update the store copy and Data safety answers before distribution through Play.
+The current sideload build opens `https://www.occanova.com/app`. It includes customer account entry and access to the website's existing customer and vendor routes. **Do not submit version 0.3 to Play yet:** vendor registration leads to Razorpay AutoPay for a platform subscription. Google Play's Payments policy may require Play Billing or an enrolled alternative-billing program for this flow. Settle that flow and update the store copy and Data safety answers before distribution through Play.
 
 ## Store listing draft
 
