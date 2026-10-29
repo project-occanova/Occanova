@@ -38,7 +38,7 @@ export default async function Directory({searchParams}:{searchParams:Promise<Rec
         <section>
           <div className="results-head"><span>{rows.length} {rows.length===1?'vendor':'vendors'} found</span><span>Featured first</span></div>
           {rows.length?<div className="results-grid">{rows.slice((page-1)*6,page*6).map(v=><VendorCard key={v.id} vendor={v}/>)}</div>:<div className="empty-state"><h2>A fresh start?</h2><p>We couldn’t find vendors for these filters. Try another service or location.</p><Link className="button outline" href="/vendors">Clear filters</Link></div>}
-          <nav className="pagination" aria-label="Results pages">{Array.from({length:pages},(_,i)=>{const q=new URLSearchParams(query);q.set('page',String(i+1));return <Link key={i} aria-current={page===i+1?'page':undefined} href={`/vendors?${q}`}>{i+1}</Link>;})}</nav>
+          {pages>1&&<nav className="pagination" aria-label="Results pages">{Array.from({length:pages},(_,i)=>{const q=new URLSearchParams(query);q.set('page',String(i+1));return <Link key={i} aria-current={page===i+1?'page':undefined} href={`/vendors?${q}`}>{i+1}</Link>;})}</nav>}
         </section>
       </div>
     </main>

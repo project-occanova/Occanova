@@ -8,7 +8,11 @@ import {LegacyRegistrationForm} from '@/components/legacy-registration-form';
 import {localPreview,publicIntakeEnabled,readOnlyDeployment} from '@/lib/config';
 import {billingEnabled} from '@/lib/subscriptions';
 const modes={'login':['Welcome back.','Your business. Your next chapter.','login'],'register':['Good things start here.','Join the people behind unforgettable celebrations.','register'],'forgot-password':['Let’s get you back in.','Enter the email associated with your account.','forgot'],'resend-verification':['Check your inbox.','Request a fresh vendor verification link.','resend'],'reset-password':['A fresh start.','Choose a new password for your account.','reset'],'verify':['Verify your email.','Verify your email to start your Occanova journey.','verify']} as const;
-export const metadata={robots:{index:false,follow:false,noarchive:true}};
+const pageTitles:Record<keyof typeof modes,string>={'login':'Vendor login','register':'Vendor registration','forgot-password':'Forgot password','resend-verification':'Resend verification email','reset-password':'Reset password','verify':'Verify email'};
+export async function generateMetadata({params}:{params:Promise<{auth:string}>}){
+ const {auth}=await params;
+ return {title:Object.hasOwn(pageTitles,auth)?pageTitles[auth as keyof typeof modes]:undefined,robots:{index:false,follow:false,noarchive:true}};
+}
 export default async function Auth({params,searchParams}:{params:Promise<{auth:string}>;searchParams:Promise<{token?:string;email?:string;portal?:string}>}){
  const [{auth},query]=await Promise.all([params,searchParams]);if(!Object.hasOwn(modes,auth))notFound();
  const [title,subtitle,mode]=modes[auth as keyof typeof modes];const subscriptionsEnabled=billingEnabled();const initialEmail=query.email?.slice(0,160);

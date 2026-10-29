@@ -27,7 +27,7 @@ export function SubmitForm({children,onSubmit,onEdit,onInput,onChange,allowIncom
   if(errors.length){event.preventDefault();onEdit?.();return;}
   onSubmit?.(event);
  }
- return <form {...props} noValidate onSubmit={submit} onInput={event=>{clear();onInput?.(event);}} onChange={event=>{clear();onChange?.(event);}}>
+ return <form {...props} method="post" noValidate onSubmit={submit} onInput={event=>{clear();onInput?.(event);}} onChange={event=>{clear();onChange?.(event);}}>
   {!!issues.length&&<div className="form-validation-summary" ref={summary} tabIndex={-1} role="alert"><strong>A few details need your attention.</strong><ul>{issues.slice(0,5).map(({control,message},index)=><li key={index}><button type="button" onClick={()=>control.focus()}>{message}</button></li>)}</ul>{issues.length>5&&<p>Complete the other required fields, then try again.</p>}</div>}
   {children}
  </form>;
