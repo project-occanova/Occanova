@@ -13,7 +13,7 @@ export default async function AppAccount(){
   {customerReady?<section className="app-account-grid" aria-label="Customer account">
    <Link href="/customer" className="app-account-card"><UserRound size={25} aria-hidden="true"/><h2>My dashboard</h2><p>See your account and event planning activity.</p><span>Open dashboard <ArrowRight size={16} aria-hidden="true"/></span></Link>
    <Link href="/app/saved" className="app-account-card"><Heart size={25} aria-hidden="true"/><h2>Saved vendors</h2><p>Return to the businesses on your shortlist.</p><span>View saved vendors <ArrowRight size={16} aria-hidden="true"/></span></Link>
-   <Link href="/customer#enquiries" className="app-account-card"><MessageSquare size={25} aria-hidden="true"/><h2>My enquiries</h2><p>Follow the requests you sent while signed in.</p><span>View enquiries <ArrowRight size={16} aria-hidden="true"/></span></Link>
+   <Link href="/app/enquiries" className="app-account-card"><MessageSquare size={25} aria-hidden="true"/><h2>My enquiries</h2><p>Follow the requests you sent while signed in.</p><span>View enquiries <ArrowRight size={16} aria-hidden="true"/></span></Link>
   </section>:user?.role==='vendor'?<section className="app-account-grid" aria-label="Vendor account">
    <Link href="/dashboard" className="app-account-card"><Store size={25} aria-hidden="true"/><h2>Vendor dashboard</h2><p>Manage your business profile and review status.</p><span>Open dashboard <ArrowRight size={16} aria-hidden="true"/></span></Link>
    <Link href="/dashboard#enquiries" className="app-account-card"><MessageSquare size={25} aria-hidden="true"/><h2>Enquiries</h2><p>Respond to customers interested in your services.</p><span>View enquiries <ArrowRight size={16} aria-hidden="true"/></span></Link>
