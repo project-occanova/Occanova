@@ -746,6 +746,7 @@ table{min-width:680px}
 .app-vendor-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
 .app-vendor-grid .vendor-card{background:var(--white);border-radius:11px}
 .app-vendor-grid .card-image{aspect-ratio:16/10}
+.app-saved-page{min-height:calc(100dvh - 190px)}.app-saved-card{min-width:0}.app-saved-card .save-vendor-action{display:block;margin-top:8px}.app-saved-card .save-vendor-button{width:100%;min-height:44px}.app-saved-actions{display:flex;flex-wrap:wrap;gap:10px}
 .app-next-step{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-top:55px;padding:38px 42px;border-radius:14px;background:var(--green);color:var(--ivory)}
 .app-next-step .app-eyebrow{color:#dbe6cf}
 .app-next-step h2{margin:7px 0;font-size:clamp(30px,3vw,42px)}
@@ -806,7 +807,7 @@ table{min-width:680px}
  .app-section{padding-top:47px}.app-section-heading{align-items:start}.app-section-heading h2{font-size:31px}.app-section-heading>a{font-size:11px}.app-category-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.app-category-grid>a{min-height:88px;padding:12px;gap:8px;align-items:flex-start;flex-direction:column}.app-category-grid>a>span{font-size:11px}.app-category-grid>a>svg:last-child{display:none}
  .app-vendor-grid{grid-template-columns:1fr;gap:16px}.app-next-step{flex-direction:column;align-items:start;margin-top:40px;padding:27px 22px}.app-next-step .button{width:100%}
  .app-footer{align-items:flex-start;flex-direction:column;gap:14px;padding-bottom:calc(92px + env(safe-area-inset-bottom))}
- .app-bottom-nav{position:fixed;inset:auto 0 0;z-index:70;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:7px 12px calc(7px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:#fffcf5f5;backdrop-filter:blur(12px);box-shadow:0 -8px 25px #20351c10}
+ .app-bottom-nav{position:fixed;inset:auto 0 0;z-index:70;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding:7px 12px calc(7px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:#fffcf5f5;backdrop-filter:blur(12px);box-shadow:0 -8px 25px #20351c10}
  .app-bottom-nav a{display:grid;place-items:center;gap:2px;min-height:50px;color:var(--green);font-size:11px;font-weight:700}
  .app-bottom-nav a[aria-current=page]{border-radius:10px;background:#e8efe0;color:#244716}
  .app-account-grid{grid-template-columns:1fr;gap:12px;margin:20px 0}.app-account-card{min-height:0;padding:21px}.app-account-card h2{font-size:24px}.app-account-card>span{padding-top:15px}

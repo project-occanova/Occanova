@@ -6,7 +6,7 @@ import {useRouter} from 'next/navigation';
 import {Heart,LogOut} from 'lucide-react';
 import {SubmitForm} from './submit-form';
 
-export function SaveVendorButton({vendorId,returnTo,initialSaved=false,initiallyAuthenticated}:{vendorId:string;returnTo:string;initialSaved?:boolean;initiallyAuthenticated?:boolean}){
+export function SaveVendorButton({vendorId,returnTo,initialSaved=false,initiallyAuthenticated,savedLabel='Saved to shortlist'}:{vendorId:string;returnTo:string;initialSaved?:boolean;initiallyAuthenticated?:boolean;savedLabel?:string}){
  const router=useRouter(),[saved,setSaved]=useState(initialSaved),[authenticated,setAuthenticated]=useState<boolean|null>(initiallyAuthenticated??null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  useEffect(()=>{
   if(initiallyAuthenticated!==undefined)return;
@@ -21,7 +21,7 @@ export function SaveVendorButton({vendorId,returnTo,initialSaved=false,initially
   try{const response=await fetch('/api/customer/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({vendorId,saved:!saved}),signal:AbortSignal.timeout(20000)});const result=await response.json();if(!response.ok)throw Error(result.error||'Could not update your saved vendors.');setSaved(Boolean(result.saved));router.refresh();}
   catch(reason){setError((reason as Error).message);}finally{setBusy(false);}
  }
- return <span className="save-vendor-action"><button type="button" className="button outline save-vendor-button" aria-pressed={saved} disabled={busy||authenticated===null} onClick={()=>void change()}><Heart size={17} fill={saved?'currentColor':'none'}/>{busy?'Saving…':saved?'Saved to shortlist':'Save vendor'}</button>{error&&<small className="error" role="alert">{error}</small>}</span>;
+ return <span className="save-vendor-action"><button type="button" className="button outline save-vendor-button" aria-pressed={saved} disabled={busy||authenticated===null} onClick={()=>void change()}><Heart size={17} fill={saved?'currentColor':'none'}/>{busy?'Saving…':saved?savedLabel:'Save vendor'}</button>{error&&<small className="error" role="alert">{error}</small>}</span>;
 }
 
 export function CustomerProfileForm({name,email,phone}:{name:string;email:string;phone:string}){

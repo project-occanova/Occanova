@@ -4,7 +4,7 @@ import {ArrowUpRight} from 'lucide-react';
 export function AppHeader(){
  return <header className="app-header"><div className="app-header-inner">
   <Link href="/app" className="app-brand" aria-label="Occanova app home"><span className="app-brand-mark"><img src="/occanova-logo.jpg" alt=""/></span><span>OCCANOVA<small>YOUR EVENT, YOUR WAY.</small></span></Link>
-  <nav className="app-top-nav" aria-label="App navigation"><Link href="/app">Discover</Link><Link href="/app/vendors">Find vendors</Link><Link href="/app/account">Account <ArrowUpRight size={16} aria-hidden="true"/></Link></nav>
+  <nav className="app-top-nav" aria-label="App navigation"><Link href="/app">Discover</Link><Link href="/app/vendors">Find vendors</Link><Link href="/app/saved">Saved vendors</Link><Link href="/app/account">Account <ArrowUpRight size={16} aria-hidden="true"/></Link></nav>
  </div></header>;
 }
 
