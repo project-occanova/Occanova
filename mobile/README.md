@@ -4,6 +4,8 @@ This is a separate React Native Android preview (`com.occanova.nativepreview`). 
 
 The preview keeps the existing website's customer and vendor flows while native screens are developed. It requires internet access. WebView has its own cookie store, so testers must sign in again. The app handles Android Back, connection errors, file selection and external phone, SMS and UPI links. External payment or bank authorization may still open another app or browser.
 
+Launch shows the Occanova logo for at least 2.2 seconds and keeps it visible until the first page finishes loading. If the page fails, the app shows a retry screen instead.
+
 ## Build
 
 Use Node 22.11+, JDK 17 and Android SDK Platform/Build Tools 36.0.0:

@@ -18,6 +18,7 @@ import {APP_URL, navigationKind, popupKind} from './src/navigation';
 
 const GREEN = '#315B1C';
 const CREAM = '#FFFCF5';
+const MIN_SPLASH_DURATION_MS = 2200;
 // The library's public types intersect iOS, Android and Windows props. This preview is Android-only.
 const AndroidWebView = WebView as unknown as React.ComponentType<
   AndroidWebViewProps & React.RefAttributes<WebView>
@@ -28,6 +29,13 @@ function AppContent() {
   const [canGoBack, setCanGoBack] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState(false);
+  const [splashTimeElapsed, setSplashTimeElapsed] = useState(false);
+  const [initialPageReady, setInitialPageReady] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSplashTimeElapsed(true), MIN_SPLASH_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -49,8 +57,11 @@ function AppContent() {
   const retry = () => {
     setError(false);
     setProgress(0);
+    setInitialPageReady(false);
     webView.current?.reload();
   };
+
+  const showSplash = !error && (!splashTimeElapsed || !initialPageReady);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -72,7 +83,10 @@ function AppContent() {
           setProgress(0);
         }}
         onLoadProgress={({nativeEvent}) => setProgress(nativeEvent.progress)}
-        onLoadEnd={() => setProgress(1)}
+        onLoadEnd={() => {
+          setProgress(1);
+          setInitialPageReady(true);
+        }}
         onError={() => setError(true)}
         onRenderProcessGone={() => setError(true)}
         onShouldStartLoadWithRequest={request => {
@@ -96,7 +110,7 @@ function AppContent() {
           }
         }}
       />
-      {!error && progress < 1 ? (
+      {!error && !showSplash && progress < 1 ? (
         <View style={styles.progressTrack} accessibilityLabel="Loading Occanova">
           <View style={[styles.progressBar, {width: `${Math.max(8, progress * 100)}%`}]} />
         </View>
@@ -114,9 +128,11 @@ function AppContent() {
             <Text style={styles.retryText}>Try again</Text>
           </Pressable>
         </View>
-      ) : progress === 0 ? (
-        <View style={styles.loadingOverlay} pointerEvents="none">
-          <ActivityIndicator color={GREEN} size="large" />
+      ) : showSplash ? (
+        <View style={styles.loadingOverlay} accessibilityLabel="Occanova is opening">
+          <Image source={require('./assets/occanova-logo.jpg')} style={styles.splashLogo} resizeMode="contain" />
+          <ActivityIndicator color={GREEN} size="small" />
+          <Text style={styles.loadingText}>Opening Occanova…</Text>
         </View>
       ) : null}
     </SafeAreaView>
@@ -142,6 +158,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: CREAM,
   },
+  splashLogo: {width: 260, height: 260, marginBottom: 12},
+  loadingText: {fontSize: 14, color: '#586253', marginTop: 18},
   errorOverlay: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center',
